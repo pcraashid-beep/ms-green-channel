@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ongoing Projects | MS Green Channel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">MS Green Channel</div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="login.html">Company Login</a></li>
+                <li><a href="projects.html" class="active">Ongoing Projects</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section class="projects-header">
+        <h1>Current Infrastructure Developments</h1>
+        <p>Harnessing sustainable energy across the region.</p>
+    </section>
+
+    <main class="projects-container">
+        <div class="project-card">
+            <div class="project-image">
+                <img src="https://via.placeholder.com/600x400?text=Hydro+Project+Alpha" alt="Project Alpha">
+                <span class="status-tag">In Progress</span>
+            </div>
+            <div class="project-info">
+                <h3>Upper River Hydro Plant</h3>
+                <p>Capacity: 25MW | Location: North Sector</p>
+                <p class="description">Construction of the primary turbine hall and diversion tunnels is 65% complete.</p>
+            </div>
+        </div>
+
+        <div class="project-card">
+            <div class="project-image">
+                <img src="https://via.placeholder.com/600x400?text=Hydro+Project+Beta" alt="Project Beta">
+                <span class="status-tag">Foundation Stage</span>
+            </div>
+            <div class="project-info">
+                <h3>Green Channel Dam Site B</h3>
+                <p>Capacity: 10MW | Location: East Basin</p>
+                <p class="description">Currently finalizing environmental impact mitigation and site clearing.</p>
+            </div>
+        </div>
+
+        </main>
+
+    <footer class="project-footer">
+        <a href="index.html" class="back-link">← Back to Home</a>
+    </footer>
+</body>
+</html>
+async function handleLogin(roleType) {
+    const username = prompt("Enter Username:");
+    const password = prompt("Enter Password:");
+
+    const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+        localStorage.setItem('token', data.token);
+        if (data.role === 'management' && roleType === 'management') {
+            window.location.href = "management-dashboard.html";
+        } else if (data.role === 'employee') {
+            window.location.href = "employee-portal.html";
+        } else {
+            alert("Role Mismatch. You do not have management access.");
+        }
+    } else {
+        alert("Login Failed!");
+    }
+}
