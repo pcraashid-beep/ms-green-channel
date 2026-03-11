@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance Control | MSGCPPL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>.photo-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer; }</style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary mb-4 shadow"><div class="container"><a class="navbar-brand fw-bold" href="management-dashboard.html">⬅ Dashboard</a></div></nav>
+    
+    <div class="container">
+        <h4 class="fw-bold mb-4">Pending Verifications</h4>
+        <div id="pending-list" class="row g-3 mb-5"></div>
+
+        <h4 class="fw-bold border-top pt-4 mb-3">Monthly Report (All Records)</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr><th>Date</th><th>Staff</th><th>Clock In</th><th>Clock Out</th></tr>
+                    </thead>
+                    <tbody id="report-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+        // 1. Added the live cloud server link
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+
+        const token = localStorage.getItem('token');
+        if (localStorage.getItem('role') !== 'admin') window.location.href = 'login.html';
+
+        async function loadData() {
+            // 2. Updated fetch to use SERVER_URL
+            const pendRes = await fetch(`${SERVER_URL}/api/attendance/admin/pending`, { headers: {'Authorization': `Bearer ${token}`} });
+            const pending = await pendRes.json();
+            const pendCont = document.getElementById('pending-list');
+            pendCont.innerHTML = pending.length ? '' : '<p class="text-muted">No pending approvals.</p>';
+
+            pending.forEach(r => {
+                if (r.clockInStatus === 'Pending' && r.clockInTime) {
+                    pendCont.innerHTML += renderCard(r._id, r.staffName, r.dateString, 'In', r.clockInTime, r.clockInPhoto, r.clockInCoords);
+                }
+                if (r.clockOutStatus === 'Pending' && r.clockOutTime) {
+                    pendCont.innerHTML += renderCard(r._id, r.staffName, r.dateString, 'Out', r.clockOutTime, r.clockOutPhoto, r.clockOutCoords);
+                }
+            });
+
+            // 3. Updated fetch to use SERVER_URL
+            const repRes = await fetch(`${SERVER_URL}/api/attendance/admin/report`, { headers: {'Authorization': `Bearer ${token}`} });
+            const reports = await repRes.json();
+            document.getElementById('report-list').innerHTML = reports.map(r => `
+                <tr>
+                    <td>${r.dateString}</td>
+                    <td class="fw-bold text-primary">@${r.staffName}</td>
+                    <td>${r.clockInTime ? new Date(r.clockInTime).toLocaleTimeString() : '--'} <span class="badge ${r.clockInStatus==='Approved'?'bg-success':r.clockInStatus==='Rejected'?'bg-danger':'bg-warning'}">${r.clockInStatus}</span></td>
+                    <td>${r.clockOutTime ? new Date(r.clockOutTime).toLocaleTimeString() : '--'} <span class="badge ${r.clockOutStatus==='Approved'?'bg-success':r.clockOutStatus==='Rejected'?'bg-danger':'bg-warning'}">${r.clockOutStatus||'N/A'}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderCard(id, staff, date, type, time, photo, coords) {
+            // FIXED: Corrected the Google Maps GPS link!
+            const mapLink = `https://maps.google.com/?q=${coords}`;
+            return `
+            <div class="col-md-6 col-lg-4">
+                <div class="card shadow-sm border-0 p-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="badge ${type==='In'?'bg-primary':'bg-dark'}">Clock ${type}</span>
+                        <small class="text-muted">${date}</small>
+                    </div>
+                    <h6 class="fw-bold">@${staff}</h6>
+                    <div class="d-flex align-items-center mb-3">
+                        <a href="${photo}" target="_blank"><img src="${photo}" class="photo-thumb me-3" alt="Proof"></a>
+                        <div>
+                            <small class="d-block text-muted">Time: ${new Date(time).toLocaleTimeString()}</small>
+                            <a href="${mapLink}" target="_blank" class="small text-decoration-none">📍 View GPS Map</a>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success flex-fill" onclick="updateStatus('${id}', '${type}', 'Approved')">Approve</button>
+                        <button class="btn btn-danger flex-fill" onclick="updateStatus('${id}', '${type}', 'Rejected')">Reject</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        async function updateStatus(id, type, status) {
+            // 4. Updated fetch to use SERVER_URL
+            await fetch(`${SERVER_URL}/api/attendance/admin/approve`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+                body: JSON.stringify({ id, type, status })
+            });
+            loadData();
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>

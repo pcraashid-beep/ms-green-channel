@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard | MSGCPPL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .stat-card { transition: transform 0.2s; cursor: pointer; border: none; border-radius: 15px; overflow: hidden; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
+        .bg-gradient-finance { background: linear-gradient(45deg, #11998e, #38ef7d); }
+        .bg-gradient-inventory { background: linear-gradient(45deg, #6a11cb, #2575fc); }
+        .bg-gradient-billing { background: linear-gradient(45deg, #f093fb, #f5576c); }
+        .bg-gradient-staff { background: linear-gradient(45deg, #00c6ff, #0072ff); }
+        .bg-gradient-subcon { background: linear-gradient(45deg, #232526, #414345); }
+        .bg-gradient-attendance { background: linear-gradient(45deg, #8E2DE2, #4A00E0); } /* New Purple Gradient for Attendance */
+        .bg-gradient-backup { background: linear-gradient(45deg, #f12711, #f5af19); }
+        .card-body { position: relative; z-index: 1; }
+        .icon-bg { position: absolute; right: -10px; bottom: -10px; font-size: 5rem; opacity: 0.1; z-index: 0; }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary shadow-sm mb-4">
+        <div class="container">
+            <span class="navbar-brand fw-bold d-flex align-items-center">
+    <img src="logo.png" alt="Logo" height="30" class="d-inline-block align-text-top me-2">
+    MSGCPPL Admin
+</span>
+            <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <div class="mb-4">
+            <h4 class="fw-bold mb-0">Welcome, <span id="adminName">Admin</span></h4>
+            <p class="text-muted small">Construction & Site Management Suite</p>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-finance text-white" onclick="window.location.href='admin-projects.html'">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2">💰</div>
+                        <h6 class="fw-bold">Project Finance</h6>
+                        <p class="small text-white-50">Budgets & Expenses</p>
+                        <div class="icon-bg">💰</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-inventory text-white" onclick="window.location.href='admin-inventory.html'">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2">📦</div>
+                        <h6 class="fw-bold">Material Stock</h6>
+                        <p class="small text-white-50">Cement & Steel</p>
+                        <div class="icon-bg">📦</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-billing text-white" onclick="window.location.href='admin-billing.html'">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2">📑</div>
+                        <h6 class="fw-bold">Client Billing</h6>
+                        <p class="small text-white-50">Invoices & Payments</p>
+                        <div class="icon-bg">📑</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-staff text-white" onclick="window.location.href='admin-staff.html'">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2">👥</div>
+                        <h6 class="fw-bold">Staff Directory</h6>
+                        <p class="small text-white-50">Employees & Tasks</p>
+                        <div class="icon-bg">👥</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-subcon text-white" onclick="window.location.href='admin-contractors.html'">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2">🏗️</div>
+                        <h6 class="fw-bold">Sub-Contractors</h6>
+                        <p class="small text-white-50">Outsourced Work</p>
+                        <div class="icon-bg">🏗️</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-attendance text-white" onclick="window.location.href='admin-attendance.html'">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2">📍</div>
+                        <h6 class="fw-bold">Attendance Log</h6>
+                        <p class="small text-white-50">GPS & Photos</p>
+                        <div class="icon-bg">📍</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card shadow-sm h-100 bg-gradient-backup text-white" onclick="downloadBackup()">
+                    <div class="card-body text-center py-4">
+                        <div class="display-5 mb-2" id="backupIcon">💾</div>
+                        <h6 class="fw-bold" id="backupTitle">Data Vault</h6>
+                        <p class="small text-white-50" id="backupDesc">Download (.zip)</p>
+                        <div class="icon-bg">💾</div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+<script>
+        // 1. Add your live cloud server link here
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+        
+        const token = localStorage.getItem('token');
+        document.getElementById('adminName').innerText = localStorage.getItem('fullName') || 'Admin';
+        
+        function logout() { 
+            localStorage.clear(); 
+            window.location.href = 'login.html'; 
+        }
+        
+        if (localStorage.getItem('role') !== 'admin') {
+            window.location.href = 'login.html';
+        }
+
+        async function downloadBackup() {
+            const icon = document.getElementById('backupIcon');
+            const title = document.getElementById('backupTitle');
+            const desc = document.getElementById('backupDesc');
+
+            icon.innerText = "⏳";
+            title.innerText = "Compressing...";
+            desc.innerText = "Please wait...";
+
+            try {
+                // 2. Update this fetch request to point to the SERVER_URL
+                const response = await fetch(`${SERVER_URL}/api/backup`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error("Failed to generate backup");
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `MSGCPPL_Data_Vault_${new Date().toISOString().split('T')[0]}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                icon.innerText = "✅";
+                title.innerText = "Complete!";
+                desc.innerText = "Check downloads.";
+                setTimeout(() => {
+                    icon.innerText = "💾";
+                    title.innerText = "Data Vault";
+                    desc.innerText = "Download (.zip)";
+                }, 3000);
+
+            } catch (err) {
+                alert("Error during backup process. Please try again.");
+                icon.innerText = "💾"; title.innerText = "Data Vault"; desc.innerText = "Download (.zip)";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Staff Management | MS Green Channel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .card { border-radius: 12px; }
+        .staff-item { transition: 0.2s; }
+        .staff-item:hover { background-color: #f8f9fa !important; }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="management-dashboard.html">⬅ Dashboard</a>
+            <span class="navbar-text text-white fw-bold">Human Resources Control</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-header bg-dark text-white fw-bold">Register New Staff</div>
+                    <div class="card-body">
+                        <form id="reg-form">
+                            <input type="text" id="rf" class="form-control mb-2" placeholder="Full Name" required>
+                            <input type="text" id="ru" class="form-control mb-2" placeholder="Username" required>
+                            <input type="password" id="rp" class="form-control mb-3" placeholder="Password" required>
+                            <button class="btn btn-primary w-100 fw-bold">Create Account</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-primary text-white fw-bold">Assign Site Task</div>
+                    <div class="card-body">
+                        <form id="task-form">
+                            <input type="text" id="ts" class="form-control mb-2" placeholder="Select staff from directory below" readonly required>
+                            <input type="text" id="tp" class="form-control mb-2" placeholder="Project Site Name" required>
+                            <textarea id="td" class="form-control mb-3" placeholder="Describe the task details..." required></textarea>
+                            <button class="btn btn-outline-primary w-100 fw-bold">Assign Task</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h4 class="fw-bold text-primary mb-0">Active Work Logs</h4>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadLogs()">🔄 Refresh</button>
+                </div>
+                <div id="log-list" class="mb-5"></div>
+
+                <h4 class="fw-bold text-danger border-bottom pb-2 mb-3">Staff Directory</h4>
+                <div id="staff-list" class="row"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+        // 1. Added the live cloud server link
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = "login.html";
+
+        async function loadAll() {
+            loadLogs();
+            loadStaff();
+        }
+
+        async function loadLogs() {
+            // Updated fetch to use SERVER_URL
+            const res = await fetch(`${SERVER_URL}/api/worklogs`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const data = await res.json();
+            const container = document.getElementById('log-list');
+            container.innerHTML = data.length ? '' : '<p class="text-muted">No active tasks found.</p>';
+            data.forEach(log => {
+                const div = document.createElement('div');
+                div.className = "card mb-2 p-3 d-flex flex-row justify-content-between align-items-center border-0 shadow-sm staff-item";
+                div.innerHTML = `
+                    <div>
+                        <span class="badge bg-secondary mb-1">${log.projectName}</span>
+                        <h6 class="mb-0"><strong>${log.staffName}</strong>: ${log.task}</h6>
+                        <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
+                    </div>
+                    <div>
+                        <span class="badge ${log.status==='Completed'?'bg-success':'bg-warning'} me-2">${log.status}</span>
+                        <button class="btn btn-sm text-danger" onclick="deleteLog('${log._id}')">🗑️</button>
+                    </div>`;
+                container.appendChild(div);
+            });
+        }
+
+        async function loadStaff() {
+            // Updated fetch to use SERVER_URL
+            const res = await fetch(`${SERVER_URL}/api/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const users = await res.json();
+            const container = document.getElementById('staff-list');
+            container.innerHTML = '';
+            users.forEach(user => {
+                const col = document.createElement('div');
+                col.className = "col-md-6 mb-2";
+                col.innerHTML = `
+                    <div class="p-2 border rounded bg-white d-flex justify-content-between align-items-center shadow-sm">
+                        <div style="cursor:pointer" onclick="selectStaff('${user.username}')">
+                            <strong class="text-primary">${user.fullName}</strong><br>
+                            <small class="text-muted">@${user.username}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteUser('${user.username}')">Delete</button>
+                    </div>`;
+                container.appendChild(col);
+            });
+        }
+
+        function selectStaff(username) {
+            document.getElementById('ts').value = username;
+            document.getElementById('tp').focus();
+        }
+
+        document.getElementById('reg-form').onsubmit = async (e) => {
+            e.preventDefault();
+            // Updated fetch to use SERVER_URL
+            const res = await fetch(`${SERVER_URL}/api/register-staff`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ fullName: rf.value, username: ru.value, password: rp.value })
+            });
+            if(res.ok) {
+                rf.value=ru.value=rp.value=''; 
+                loadStaff();
+                alert("Staff registered successfully!");
+            }
+        };
+
+        document.getElementById('task-form').onsubmit = async (e) => {
+            e.preventDefault();
+            // Updated fetch to use SERVER_URL
+            const res = await fetch(`${SERVER_URL}/api/worklogs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ staffName: ts.value, projectName: tp.value, task: td.value })
+            });
+            if(res.ok) { 
+                ts.value=tp.value=td.value=''; 
+                loadLogs(); 
+            }
+        };
+
+        async function deleteLog(id) {
+            if(confirm("Remove this work log?")) {
+                // Updated fetch to use SERVER_URL
+                await fetch(`${SERVER_URL}/api/worklogs/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                loadLogs();
+            }
+        }
+
+        async function deleteUser(username) {
+            if(confirm(`Permanently delete account @${username}?`)) {
+                // Updated fetch to use SERVER_URL
+                await fetch(`${SERVER_URL}/api/users/${username}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                loadStaff();
+            }
+        }
+
+        window.onload = loadAll;
+    </script>
+</body>
+</html>

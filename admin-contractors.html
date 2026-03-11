@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contractors | MS Green Channel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-secondary mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="management-dashboard.html">⬅ Dashboard</a>
+            <span class="navbar-text text-white fw-bold">Sub-Contractor Registry</span>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-dark text-white fw-bold">New Contractor Entry</div>
+                    <div class="card-body">
+                        <form id="c-form">
+                            <label class="small fw-bold">Contractor Name</label>
+                            <input type="text" id="cN" class="form-control mb-2" placeholder="e.g. ABC Constructions" required>
+                            
+                            <label class="small fw-bold">Start Date</label>
+                            <input type="date" id="cS" class="form-control mb-2" required>
+                            
+                            <label class="small fw-bold">Upload Work Order (PDF/Image)</label>
+                            <input type="file" id="cFile" class="form-control mb-3" accept=".pdf,image/*">
+                            
+                            <button class="btn btn-secondary w-100 fw-bold" id="saveBtn">Add Contractor</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <h4 class="fw-bold text-secondary">Active Contractors</h4>
+                <div id="c-list"></div>
+            </div>
+        </div>
+    </div>
+<script>
+        // 1. Added the live cloud server link
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = "login.html";
+
+        async function load() {
+            // Updated fetch to use SERVER_URL
+            const res = await fetch(`${SERVER_URL}/api/contractors`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const list = await res.json();
+            const container = document.getElementById('c-list');
+            container.innerHTML = list.length ? '' : '<p class="text-muted">No contractors recorded yet.</p>';
+            
+            list.forEach(c => {
+                const div = document.createElement('div');
+                div.className = "card mb-2 p-3 border-0 shadow-sm d-flex flex-row justify-content-between align-items-center";
+                div.innerHTML = `
+                    <div>
+                        <h6 class="mb-0 fw-bold">${c.name}</h6>
+                        <small class="text-muted">Started: ${c.startDate}</small>
+                    </div>
+                    <div>
+                        ${c.workOrderUrl ? `<a href="${c.workOrderUrl}" target="_blank" class="btn btn-sm btn-outline-primary">View PDF</a>` : '<span class="text-muted small">No File</span>'}
+                        <button class="btn btn-sm btn-danger ms-2" onclick="del('${c._id}')">Delete</button>
+                    </div>`;
+                container.appendChild(div);
+            });
+        }
+
+        document.getElementById('c-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerText = "Processing...";
+
+            let fileUrl = "";
+            const fileInput = document.getElementById('cFile');
+
+            // Step 1: Upload File if it exists
+            if (fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('workOrder', fileInput.files[0]);
+                // Updated fetch to use SERVER_URL
+                const uploadRes = await fetch(`${SERVER_URL}/api/upload-work-order`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                fileUrl = uploadData.url;
+            }
+
+            // Step 2: Save Data to MongoDB
+            // Updated fetch to use SERVER_URL
+            await fetch(`${SERVER_URL}/api/contractors`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ name: cN.value, startDate: cS.value, workOrderUrl: fileUrl })
+            });
+
+            saveBtn.disabled = false;
+            saveBtn.innerText = "Add Contractor";
+            cN.value = cS.value = cFile.value = '';
+            load();
+        };
+
+        async function del(id) {
+            if(confirm("Remove this contractor?")) {
+                // Updated fetch to use SERVER_URL
+                await fetch(`${SERVER_URL}/api/contractors/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                load();
+            }
+        }
+        window.onload = load;
+    </script>
+</body>
+</html>
