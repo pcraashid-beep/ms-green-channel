@@ -8,6 +8,8 @@
         .card { border-radius: 12px; }
         .staff-item { transition: 0.2s; }
         .staff-item:hover { background-color: #f8f9fa !important; }
+        .badge-admin { background-color: #dc3545; color: white; }
+        .badge-staff { background-color: #6c757d; color: white; }
     </style>
 </head>
 <body class="bg-light">
@@ -22,12 +24,24 @@
         <div class="row">
             <div class="col-md-4">
                 <div class="card shadow-sm mb-4 border-0">
-                    <div class="card-header bg-dark text-white fw-bold">Register New Staff</div>
+                    <div class="card-header bg-dark text-white fw-bold">Register New Account</div>
                     <div class="card-body">
                         <form id="reg-form">
-                            <input type="text" id="rf" class="form-control mb-2" placeholder="Full Name" required>
-                            <input type="text" id="ru" class="form-control mb-2" placeholder="Username" required>
-                            <input type="password" id="rp" class="form-control mb-3" placeholder="Password" required>
+                            <label class="small fw-bold text-muted">Full Name</label>
+                            <input type="text" id="rf" class="form-control mb-2" placeholder="Ex: John Doe" required>
+                            
+                            <label class="small fw-bold text-muted">Username</label>
+                            <input type="text" id="ru" class="form-control mb-2" placeholder="Ex: john123" required>
+                            
+                            <label class="small fw-bold text-muted">Password</label>
+                            <input type="password" id="rp" class="form-control mb-2" placeholder="••••••••" required>
+                            
+                            <label class="small fw-bold text-muted">Assign Role</label>
+                            <select id="rr" class="form-select mb-3">
+                                <option value="staff" selected>Regular Staff</option>
+                                <option value="admin">System Admin</option>
+                            </select>
+
                             <button class="btn btn-primary w-100 fw-bold">Create Account</button>
                         </form>
                     </div>
@@ -53,119 +67,126 @@
                 </div>
                 <div id="log-list" class="mb-5"></div>
 
-                <h4 class="fw-bold text-danger border-bottom pb-2 mb-3">Staff Directory</h4>
+                <h4 class="fw-bold text-danger border-bottom pb-2 mb-3">User Directory</h4>
                 <div id="staff-list" class="row"></div>
             </div>
         </div>
     </div>
 
 <script>
-        // 1. Added the live cloud server link
-        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+    const SERVER_URL = "https://msgcppl-backend.onrender.com";
+    const token = localStorage.getItem('token');
+    
+    if (!token) window.location.href = "login.html";
 
-        const token = localStorage.getItem('token');
-        if (!token) window.location.href = "login.html";
+    async function loadAll() {
+        loadLogs();
+        loadStaff();
+    }
 
-        async function loadAll() {
+    async function loadLogs() {
+        const res = await fetch(`${SERVER_URL}/api/worklogs`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        const container = document.getElementById('log-list');
+        container.innerHTML = data.length ? '' : '<p class="text-muted">No active tasks found.</p>';
+        data.forEach(log => {
+            const div = document.createElement('div');
+            div.className = "card mb-2 p-3 d-flex flex-row justify-content-between align-items-center border-0 shadow-sm staff-item";
+            div.innerHTML = `
+                <div>
+                    <span class="badge bg-secondary mb-1">${log.projectName}</span>
+                    <h6 class="mb-0"><strong>${log.staffName}</strong>: ${log.task}</h6>
+                    <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
+                </div>
+                <div>
+                    <span class="badge ${log.status==='Completed'?'bg-success':'bg-warning'} me-2">${log.status}</span>
+                    <button class="btn btn-sm text-danger" onclick="deleteLog('${log._id}')">🗑️</button>
+                </div>`;
+            container.appendChild(div);
+        });
+    }
+
+    async function loadStaff() {
+        // Fetches all users from backend
+        const res = await fetch(`${SERVER_URL}/api/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const users = await res.json();
+        const container = document.getElementById('staff-list');
+        container.innerHTML = '';
+        
+        users.forEach(user => {
+            // Determine badge color based on role
+            const roleBadge = user.role === 'admin' ? 'badge-admin' : 'badge-staff';
+            
+            const col = document.createElement('div');
+            col.className = "col-md-6 mb-2";
+            col.innerHTML = `
+                <div class="p-2 border rounded bg-white d-flex justify-content-between align-items-center shadow-sm">
+                    <div style="cursor:pointer" onclick="selectStaff('${user.username}')">
+                        <strong class="text-primary">${user.fullName}</strong> 
+                        <span class="badge ${roleBadge} ms-1" style="font-size: 0.7rem;">${user.role}</span><br>
+                        <small class="text-muted">@${user.username}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteUser('${user.username}')">Delete</button>
+                </div>`;
+            container.appendChild(col);
+        });
+    }
+
+    function selectStaff(username) {
+        document.getElementById('ts').value = username;
+        document.getElementById('tp').focus();
+    }
+
+    // UPDATED REGISTRATION LOGIC
+    document.getElementById('reg-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const res = await fetch(`${SERVER_URL}/api/register-staff`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ 
+                fullName: rf.value, 
+                username: ru.value, 
+                password: rp.value,
+                role: document.getElementById('rr').value // NOW SENDING THE ROLE
+            })
+        });
+        
+        if(res.ok) {
+            rf.value = ru.value = rp.value = ''; 
+            document.getElementById('rr').value = 'staff';
+            loadStaff();
+            alert("Account registered successfully!");
+        } else {
+            const errData = await res.json();
+            alert("Error: " + errData.error);
+        }
+    };
+
+    document.getElementById('task-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const res = await fetch(`${SERVER_URL}/api/worklogs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ staffName: ts.value, projectName: tp.value, task: td.value })
+        });
+        if(res.ok) { ts.value=tp.value=td.value=''; loadLogs(); }
+    };
+
+    async function deleteLog(id) {
+        if(confirm("Remove this work log?")) {
+            await fetch(`${SERVER_URL}/api/worklogs/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
             loadLogs();
+        }
+    }
+
+    async function deleteUser(username) {
+        if(confirm(`Permanently delete account @${username}?`)) {
+            await fetch(`${SERVER_URL}/api/users/${username}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
             loadStaff();
         }
+    }
 
-        async function loadLogs() {
-            // Updated fetch to use SERVER_URL
-            const res = await fetch(`${SERVER_URL}/api/worklogs`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await res.json();
-            const container = document.getElementById('log-list');
-            container.innerHTML = data.length ? '' : '<p class="text-muted">No active tasks found.</p>';
-            data.forEach(log => {
-                const div = document.createElement('div');
-                div.className = "card mb-2 p-3 d-flex flex-row justify-content-between align-items-center border-0 shadow-sm staff-item";
-                div.innerHTML = `
-                    <div>
-                        <span class="badge bg-secondary mb-1">${log.projectName}</span>
-                        <h6 class="mb-0"><strong>${log.staffName}</strong>: ${log.task}</h6>
-                        <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
-                    </div>
-                    <div>
-                        <span class="badge ${log.status==='Completed'?'bg-success':'bg-warning'} me-2">${log.status}</span>
-                        <button class="btn btn-sm text-danger" onclick="deleteLog('${log._id}')">🗑️</button>
-                    </div>`;
-                container.appendChild(div);
-            });
-        }
-
-        async function loadStaff() {
-            // Updated fetch to use SERVER_URL
-            const res = await fetch(`${SERVER_URL}/api/users`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const users = await res.json();
-            const container = document.getElementById('staff-list');
-            container.innerHTML = '';
-            users.forEach(user => {
-                const col = document.createElement('div');
-                col.className = "col-md-6 mb-2";
-                col.innerHTML = `
-                    <div class="p-2 border rounded bg-white d-flex justify-content-between align-items-center shadow-sm">
-                        <div style="cursor:pointer" onclick="selectStaff('${user.username}')">
-                            <strong class="text-primary">${user.fullName}</strong><br>
-                            <small class="text-muted">@${user.username}</small>
-                        </div>
-                        <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteUser('${user.username}')">Delete</button>
-                    </div>`;
-                container.appendChild(col);
-            });
-        }
-
-        function selectStaff(username) {
-            document.getElementById('ts').value = username;
-            document.getElementById('tp').focus();
-        }
-
-        document.getElementById('reg-form').onsubmit = async (e) => {
-            e.preventDefault();
-            // Updated fetch to use SERVER_URL
-            const res = await fetch(`${SERVER_URL}/api/register-staff`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ fullName: rf.value, username: ru.value, password: rp.value })
-            });
-            if(res.ok) {
-                rf.value=ru.value=rp.value=''; 
-                loadStaff();
-                alert("Staff registered successfully!");
-            }
-        };
-
-        document.getElementById('task-form').onsubmit = async (e) => {
-            e.preventDefault();
-            // Updated fetch to use SERVER_URL
-            const res = await fetch(`${SERVER_URL}/api/worklogs`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ staffName: ts.value, projectName: tp.value, task: td.value })
-            });
-            if(res.ok) { 
-                ts.value=tp.value=td.value=''; 
-                loadLogs(); 
-            }
-        };
-
-        async function deleteLog(id) {
-            if(confirm("Remove this work log?")) {
-                // Updated fetch to use SERVER_URL
-                await fetch(`${SERVER_URL}/api/worklogs/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                loadLogs();
-            }
-        }
-
-        async function deleteUser(username) {
-            if(confirm(`Permanently delete account @${username}?`)) {
-                // Updated fetch to use SERVER_URL
-                await fetch(`${SERVER_URL}/api/users/${username}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                loadStaff();
-            }
-        }
-
-        window.onload = loadAll;
-    </script>
+    window.onload = loadAll;
+</script>
 </body>
 </html>
