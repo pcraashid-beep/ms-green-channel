@@ -37,6 +37,24 @@
         </div>
     </div>
 <script>
+// TEMPORARY: Run this once to create your admin account
+async function setupAdmin() {
+    const SERVER_URL = "https://msgcppl-backend.onrender.com";
+    await fetch(`${SERVER_URL}/api/register-staff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            fullName: "System Admin", 
+            username: "admin", 
+            password: "AdminPassword123",
+            role: "admin" // This makes sure you have full control
+        })
+    });
+    alert("Admin account created! You can now log in.");
+}
+// Uncomment the line below, save, and upload to GitHub. 
+// Once the alert pops up on your site, delete this whole function.
+setupAdmin();
         // 1. Added the live cloud server link
         const SERVER_URL = "https://msgcppl-backend.onrender.com";
 
