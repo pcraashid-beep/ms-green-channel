@@ -6,49 +6,84 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-dark bg-dark mb-4"><div class="container"><a class="navbar-brand fw-bold" href="management-dashboard.html">⬅ Dashboard</a></div></nav>
+    
+    <nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container d-flex justify-content-between">
+            <a class="navbar-brand fw-bold" id="nav-brand" href="management-dashboard.html">⬅ Back to Dashboard</a>
+            <div id="nav-right">
+                <span class="text-white me-3 fw-bold small">User: <span id="user-display" class="text-warning">...</span></span>
+                <button class="btn btn-sm btn-outline-danger d-none fw-bold" id="logout-btn" onclick="localStorage.clear(); window.location.href='login.html'">Logout</button>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <div class="row">
             <div class="col-md-4">
-                <div class="card p-3 shadow-sm border-0 mb-4">
+                <div class="card p-3 shadow-sm border-0 border-top border-dark border-4 mb-4">
                     <h6 class="fw-bold">Update Stock</h6>
-                    <select id="invProj" class="form-select mb-2" onchange="refreshList()"></select>
-                    <input type="text" id="invItem" class="form-control mb-2" placeholder="Item (e.g. Cement)">
-                    <div class="input-group mb-2">
-                        <input type="number" id="invQty" class="form-control" placeholder="Qty">
-                        <input type="text" id="invUnit" class="form-control" placeholder="Unit (Bags/Kg)">
+                    <select id="invProj" class="form-select mb-3 bg-light" onchange="refreshList()">
+                        <option>Loading sites...</option>
+                    </select>
+                    
+                    <label class="small fw-bold text-muted mb-1">Item Name</label>
+                    <input type="text" id="invItem" class="form-control mb-3 bg-light" placeholder="Ex: Cement, Steel TMT">
+                    
+                    <label class="small fw-bold text-muted mb-1">Quantity & Unit</label>
+                    <div class="input-group mb-4">
+                        <input type="number" id="invQty" class="form-control bg-light" placeholder="Qty (e.g. 50)">
+                        <input type="text" id="invUnit" class="form-control bg-light" placeholder="Unit (Bags/Kg)">
                     </div>
-                    <button class="btn btn-primary w-100 fw-bold" onclick="updateInv()">Add to Stock</button>
+                    
+                    <button class="btn btn-primary w-100 fw-bold py-2 shadow-sm" onclick="updateInv()">➕ Add to Stock</button>
                 </div>
             </div>
+            
             <div class="col-md-8">
                 <div class="card p-3 shadow-sm border-0">
                     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                        <h6 class="fw-bold mb-0">Current Inventory Levels</h6>
-                        <button class="btn btn-sm btn-outline-dark" onclick="loadAllStock()">View All Sites Stock</button>
+                        <h5 class="fw-bold mb-0 text-dark">Current Inventory Levels</h5>
+                        <button class="btn btn-sm btn-dark fw-bold shadow-sm" onclick="loadAllStock()">View All Sites</button>
                     </div>
-                    <div id="inv-list"></div>
+                    <div id="inv-list">
+                        <div class="text-center text-muted py-4">Loading stock data...</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
 <script>
-        // 1. Added the live cloud server link
         const SERVER_URL = "https://msgcppl-backend.onrender.com";
 
         const token = localStorage.getItem('token');
+        const role = localStorage.getItem('role');
+        const fullName = localStorage.getItem('fullName');
+        
+        // Block unauthorized access
+        if (role !== 'admin' && role !== 'storekeeper') {
+            window.location.href = 'login.html';
+        }
+
+        // Adjust UI for Storekeeper vs Admin
+        document.getElementById('user-display').innerText = fullName;
+        if (role === 'storekeeper') {
+            document.getElementById('nav-brand').innerText = '📦 Storekeeper Portal';
+            document.getElementById('nav-brand').href = '#';
+            document.getElementById('logout-btn').classList.remove('d-none');
+        }
         
         async function load() {
-            // Updated fetch to use SERVER_URL
             const pRes = await fetch(`${SERVER_URL}/api/projects`, { headers: {'Authorization': `Bearer ${token}`} });
             const projects = await pRes.json();
             const sel = document.getElementById('invProj');
             sel.innerHTML = projects.map(p => `<option value="${p._id}">${p.name}</option>`).join('');
-            refreshList();
+            
+            if(projects.length > 0) refreshList();
+            else document.getElementById('inv-list').innerHTML = "<p class='text-muted'>No projects available.</p>";
         }
         
         async function updateInv() {
-            // Updated fetch to use SERVER_URL
             await fetch(`${SERVER_URL}/api/inventory`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
@@ -58,36 +93,33 @@
         }
 
         async function refreshList() {
-            // Updated fetch to use SERVER_URL
             const res = await fetch(`${SERVER_URL}/api/inventory/${invProj.value}`, { headers: {'Authorization': `Bearer ${token}`} });
             renderInv(await res.json(), false);
         }
 
         async function loadAllStock() {
-            // Updated fetch to use SERVER_URL
             const res = await fetch(`${SERVER_URL}/api/inventory/all`, { headers: {'Authorization': `Bearer ${token}`} });
             renderInv(await res.json(), true);
         }
 
         function renderInv(items, showSite) {
             document.getElementById('inv-list').innerHTML = items.length ? items.map(i => `
-                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                <div class="d-flex justify-content-between align-items-center border-bottom py-3">
                     <div>
-                        ${showSite ? `<span class="badge bg-secondary mb-1">${i.projectName}</span><br>` : ''}
-                        <strong>${i.itemName}</strong>
+                        ${showSite ? `<span class="badge bg-secondary mb-2">${i.projectName}</span><br>` : ''}
+                        <strong class="text-primary fs-5">${i.itemName}</strong>
                     </div>
                     <div class="text-end">
-                        <span class="fw-bold d-block mb-1">${i.quantity} ${i.unit}</span>
-                        <button class="btn btn-sm btn-warning py-0 px-2" onclick="consumeStock('${i._id}')">Consume</button>
-                        <button class="btn btn-sm btn-danger py-0 px-2 ms-1" onclick="deleteStock('${i._id}')">🗑</button>
+                        <span class="fw-bold fs-5 text-dark d-block mb-2">${i.quantity} <span class="fs-6 text-muted">${i.unit}</span></span>
+                        <button class="btn btn-sm btn-warning fw-bold px-3 shadow-sm" onclick="consumeStock('${i._id}')">Consume</button>
+                        <button class="btn btn-sm btn-danger px-3 ms-1 shadow-sm" onclick="deleteStock('${i._id}')">🗑</button>
                     </div>
-                </div>`).join('') : '<p class="text-muted small">No stock available.</p>';
+                </div>`).join('') : '<p class="text-muted text-center py-4">No stock available.</p>';
         }
 
         async function consumeStock(id) {
             const amt = prompt("Enter quantity to consume from site:");
             if (amt && !isNaN(amt)) {
-                // Updated fetch to use SERVER_URL
                 const res = await fetch(`${SERVER_URL}/api/inventory/consume/${id}`, {
                     method: 'PUT', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
                     body: JSON.stringify({ consumeAmount: amt })
@@ -98,7 +130,6 @@
 
         async function deleteStock(id) {
             if(confirm("Delete this inventory item entirely?")) {
-                // Updated fetch to use SERVER_URL
                 await fetch(`${SERVER_URL}/api/inventory/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
                 refreshList();
             }

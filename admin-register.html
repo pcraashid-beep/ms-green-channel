@@ -9,6 +9,7 @@
         body { background: #f4f7f6; }
         .badge-admin { background-color: #dc3545; color: white; }
         .badge-staff { background-color: #6c757d; color: white; }
+        .badge-storekeeper { background-color: #0d6efd; color: white; }
         .staff-item { transition: 0.2s; }
         .staff-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important; }
     </style>
@@ -40,6 +41,7 @@
                             <label class="small fw-bold text-muted mb-1">Assign Role</label>
                             <select id="rr" class="form-select mb-4 bg-light">
                                 <option value="staff" selected>Regular Staff</option>
+                                <option value="storekeeper">Storekeeper (Inventory Manager)</option>
                                 <option value="admin">System Admin</option>
                             </select>
 
@@ -54,9 +56,7 @@
                     <h4 class="fw-bold mb-0 text-dark">Staff Directory</h4>
                     <button class="btn btn-sm btn-outline-secondary" onclick="loadStaff()">🔄 Refresh</button>
                 </div>
-                <div id="staff-list" class="row g-2">
-                    <div class="text-center text-muted py-3">Loading directory...</div>
-                </div>
+                <div id="staff-list" class="row g-2"></div>
             </div>
         </div>
     </div>
@@ -75,7 +75,10 @@
             container.innerHTML = '';
             
             users.forEach(user => {
-                const roleBadge = user.role === 'admin' ? 'badge-admin' : 'badge-staff';
+                let roleBadge = 'badge-staff';
+                if(user.role === 'admin') roleBadge = 'badge-admin';
+                if(user.role === 'storekeeper') roleBadge = 'badge-storekeeper';
+
                 const col = document.createElement('div');
                 col.className = "col-md-6";
                 col.innerHTML = `
@@ -89,9 +92,7 @@
                     </div>`;
                 container.appendChild(col);
             });
-        } catch (e) {
-            document.getElementById('staff-list').innerHTML = '<div class="text-danger w-100 text-center">Failed to load directory.</div>';
-        }
+        } catch (e) {}
     }
 
     document.getElementById('reg-form').onsubmit = async (e) => {

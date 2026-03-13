@@ -37,7 +37,7 @@
         </div>
     </div>
 
-    <script>
+<script>
         const SERVER_URL = "https://msgcppl-backend.onrender.com";
 
         document.getElementById('login-form').onsubmit = async (e) => {
@@ -62,8 +62,11 @@
                     localStorage.setItem('fullName', data.fullName);
                     localStorage.setItem('username', data.username);
                     
+                    // NEW ROUTING LOGIC
                     if (String(data.role).toLowerCase() === 'admin') {
                         window.location.href = "management-dashboard.html";
+                    } else if (String(data.role).toLowerCase() === 'storekeeper') {
+                        window.location.href = "admin-inventory.html";
                     } else {
                         window.location.href = "employee-portal.html";
                     }
