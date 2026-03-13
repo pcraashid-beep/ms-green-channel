@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tour Diary | MS Green Channel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --msg-green: #2e7d32; }
+        .sidebar { min-height: 100vh; background: var(--msg-green); color: white; padding: 20px; }
+        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; transition: 0.2s; }
+        .nav-link:hover { opacity: 1; padding-left: 5px; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 sidebar shadow">
+                <div class="text-center mb-4 border-bottom border-success pb-3">
+                    <img src="logo.png" alt="MSGCPPL" style="max-width: 70px; margin-bottom: 10px;">
+                    <h5 class="text-white fw-bold mb-0">MSGCPPL</h5>
+                </div>
+                <div class="nav flex-column">
+                    <a class="nav-link" href="employee-portal.html">🏠 Home Hub</a>
+                    <a class="nav-link" href="staff-tasks.html">📋 Assigned Tasks</a>
+                    <a class="nav-link" href="staff-attendance.html">📅 Attendance</a>
+                    <a class="nav-link" href="staff-approval.html">✅ Special Approval</a>
+                    <a class="nav-link fw-bold text-info" style="opacity: 1;" href="tourdiary.html">✈️ Tour Diary</a>
+                    <a class="nav-link" href="staff-expense.html">💰 Expense Diary</a>
+                    <a class="nav-link text-warning mt-5 fw-bold" href="#" onclick="localStorage.clear(); window.location.href='login.html'">🚪 Logout</a>
+                </div>
+            </nav>
+
+            <main class="col-md-10 p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <h3 class="fw-bold mb-0 text-info text-darken-2">Daily Tour Diary</h3>
+                    <span class="badge bg-success p-2 fs-6 shadow-sm">User: <span id="user-display">...</span></span>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-5 mb-4">
+                        <div class="card shadow-sm border-0 border-top border-info border-4">
+                            <div class="card-body p-4">
+                                <h5 class="fw-bold mb-3">Log Today's Tour</h5>
+                                <form id="tour-form">
+                                    <label class="small fw-bold text-muted mb-1">Date</label>
+                                    <input type="date" id="tDate" class="form-control mb-3 bg-light" required>
+                                    
+                                    <label class="small fw-bold text-muted mb-1">Location / Site Visited</label>
+                                    <input type="text" id="tLoc" class="form-control mb-3 bg-light" placeholder="Ex: Thathri Site to Jammu HQ" required>
+                                    
+                                    <label class="small fw-bold text-muted mb-1">Activities & Accomplishments</label>
+                                    <textarea id="tAct" class="form-control mb-4 bg-light" rows="4" placeholder="Describe the work done, meetings held, etc." required></textarea>
+                                    
+                                    <button type="submit" id="btnSubmit" class="btn btn-info text-white w-100 fw-bold py-2 shadow-sm">Submit Entry</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <h5 class="fw-bold text-dark mb-3">My Previous Entries & Admin Reviews</h5>
+                        <div id="tour-list"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+<script>
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+        const token = localStorage.getItem('token');
+        const fullName = localStorage.getItem('fullName');
+
+        if (!token) window.location.href = "login.html";
+        document.getElementById('user-display').innerText = fullName;
+        
+        // Auto-fill today's date
+        document.getElementById('tDate').value = new Date().toISOString().split('T')[0];
+
+        async function loadTourHistory() {
+            const res = await fetch(`${SERVER_URL}/api/tourdiary/my`, { headers: {'Authorization': `Bearer ${token}`} });
+            const data = await res.json();
+            const list = document.getElementById('tour-list');
+            
+            list.innerHTML = data.length ? data.map(entry => `
+                <div class="card mb-3 border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                            <h6 class="fw-bold text-primary mb-0">${entry.dateString} - ${entry.location}</h6>
+                            <span class="badge ${entry.status === 'Reviewed' ? 'bg-success' : 'bg-warning text-dark'}">${entry.status}</span>
+                        </div>
+                        <p class="small text-dark mb-3" style="white-space: pre-wrap;">${entry.activities}</p>
+                        
+                        ${entry.adminReview ? `
+                            <div class="bg-light p-2 rounded border-start border-success border-3">
+                                <strong class="small text-success d-block">Admin Review:</strong>
+                                <span class="small text-muted">${entry.adminReview}</span>
+                            </div>
+                        ` : '<div class="text-muted small fst-italic">Waiting for admin review...</div>'}
+                    </div>
+                </div>
+            `).join('') : '<p class="text-muted p-3 bg-white rounded border">No tour entries logged yet.</p>';
+        }
+
+        document.getElementById('tour-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmit');
+            btn.disabled = true; btn.innerText = "Saving...";
+
+            await fetch(`${SERVER_URL}/api/tourdiary`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+                body: JSON.stringify({ 
+                    dateString: document.getElementById('tDate').value,
+                    location: document.getElementById('tLoc').value,
+                    activities: document.getElementById('tAct').value
+                })
+            });
+
+            document.getElementById('tLoc').value = '';
+            document.getElementById('tAct').value = '';
+            btn.disabled = false; btn.innerText = "Submit Entry";
+            loadTourHistory();
+        };
+
+        window.onload = loadTourHistory;
+    </script>
+</body>
+</html>

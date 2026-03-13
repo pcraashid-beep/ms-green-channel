@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Diary | MS Green Channel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --msg-green: #2e7d32; }
+        .sidebar { min-height: 100vh; background: var(--msg-green); color: white; padding: 20px; }
+        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; transition: 0.2s; }
+        .nav-link:hover { opacity: 1; padding-left: 5px; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 sidebar shadow">
+                <div class="text-center mb-4 border-bottom border-success pb-3">
+                    <img src="logo.png" alt="MSGCPPL" style="max-width: 70px; margin-bottom: 10px;">
+                    <h5 class="text-white fw-bold mb-0">MSGCPPL</h5>
+                </div>
+                <div class="nav flex-column">
+                    <a class="nav-link" href="employee-portal.html">🏠 Home Hub</a>
+                    <a class="nav-link" href="staff-tasks.html">📋 Assigned Tasks</a>
+                    <a class="nav-link" href="staff-attendance.html">📅 Attendance</a>
+                    <a class="nav-link" href="staff-approval.html">✅ Special Approval</a>
+                    <a class="nav-link" href="tourdiary.html">✈️ Tour Diary</a>
+                    <a class="nav-link fw-bold text-warning" style="opacity: 1;" href="staff-expense.html">💰 Expense Diary</a>
+                    <a class="nav-link text-warning mt-5 fw-bold" href="#" onclick="localStorage.clear(); window.location.href='login.html'">🚪 Logout</a>
+                </div>
+            </nav>
+
+            <main class="col-md-10 p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <h3 class="fw-bold mb-0 text-secondary">Petty Cash & Expense Log</h3>
+                    <span class="badge bg-success p-2 fs-6 shadow-sm">User: <span id="user-display">...</span></span>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-5 mb-4">
+                        <div class="card shadow-sm border-0 border-top border-secondary border-4">
+                            <div class="card-body p-4">
+                                <h5 class="fw-bold mb-3">Submit Expense Record</h5>
+                                <form id="expense-form">
+                                    <label class="small fw-bold text-muted mb-1">Date of Expense</label>
+                                    <input type="date" id="eDate" class="form-control mb-3 bg-light" required>
+                                    
+                                    <label class="small fw-bold text-muted mb-1">Amount Spent (₹)</label>
+                                    <input type="number" id="eAmt" class="form-control mb-3 bg-light" placeholder="Ex: 1500" required>
+                                    
+                                    <label class="small fw-bold text-muted mb-1">Purpose / Details</label>
+                                    <textarea id="ePurp" class="form-control mb-3 bg-light" rows="2" placeholder="Ex: Fuel for generator, bus ticket, etc." required></textarea>
+
+                                    <label class="small fw-bold text-muted mb-1">Upload Bill/Receipt (Optional)</label>
+                                    <input type="file" id="eFile" class="form-control mb-4 bg-light" accept="image/*,.pdf">
+                                    
+                                    <button type="submit" id="btnSubmit" class="btn btn-secondary text-white w-100 fw-bold py-2 shadow-sm">Log Expense</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <h5 class="fw-bold text-dark mb-3">My Expense History</h5>
+                        <div id="expense-list"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+<script>
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+        const token = localStorage.getItem('token');
+        const fullName = localStorage.getItem('fullName');
+
+        if (!token) window.location.href = "login.html";
+        document.getElementById('user-display').innerText = fullName;
+        document.getElementById('eDate').value = new Date().toISOString().split('T')[0];
+
+        async function loadExpenseHistory() {
+            const res = await fetch(`${SERVER_URL}/api/expensediary/my`, { headers: {'Authorization': `Bearer ${token}`} });
+            const data = await res.json();
+            const list = document.getElementById('expense-list');
+            
+            list.innerHTML = data.length ? data.map(ex => `
+                <div class="card mb-3 border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">₹${ex.amount.toLocaleString()}</h5>
+                                <small class="text-muted fw-bold">${ex.dateString}</small>
+                            </div>
+                            <span class="badge ${ex.status === 'Approved' ? 'bg-success' : ex.status === 'Rejected' ? 'bg-danger' : 'bg-warning text-dark'}">${ex.status}</span>
+                        </div>
+                        <p class="text-muted mb-2">${ex.purpose}</p>
+                        ${ex.billUrl ? `<a href="${SERVER_URL}${ex.billUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">📎 View Bill</a>` : ''}
+                    </div>
+                </div>
+            `).join('') : '<p class="text-muted p-3 bg-white rounded border text-center">No expenses logged yet.</p>';
+        }
+
+        document.getElementById('expense-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmit');
+            btn.disabled = true; btn.innerText = "Uploading...";
+
+            let fileUrl = "";
+            const file = document.getElementById('eFile').files[0];
+
+            if (file) {
+                const fd = new FormData(); fd.append('file', file);
+                const upRes = await fetch(`${SERVER_URL}/api/upload-file`, { method: 'POST', headers: {'Authorization': `Bearer ${token}`}, body: fd });
+                fileUrl = (await upRes.json()).url;
+            }
+
+            await fetch(`${SERVER_URL}/api/expensediary`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+                body: JSON.stringify({ 
+                    dateString: document.getElementById('eDate').value,
+                    amount: document.getElementById('eAmt').value,
+                    purpose: document.getElementById('ePurp').value,
+                    billUrl: fileUrl
+                })
+            });
+
+            document.getElementById('eAmt').value = '';
+            document.getElementById('ePurp').value = '';
+            document.getElementById('eFile').value = '';
+            btn.disabled = false; btn.innerText = "Log Expense";
+            loadExpenseHistory();
+        };
+
+        window.onload = loadExpenseHistory;
+    </script>
+</body>
+</html>

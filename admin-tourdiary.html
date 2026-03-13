@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Tour Diaries | MSGCPPL Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f7f6; }
+        .card { border-radius: 12px; }
+        .border-pending { border-top: 4px solid #ffc107 !important; }
+        .border-reviewed { border-top: 4px solid #198754 !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark mb-4 shadow-sm" style="background-color: #16a085;">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="admin-staff.html">⬅ Back to HR Hub</a>
+            <span class="navbar-text text-white fw-bold d-none d-md-block">Tour Diary Reviews</span>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
+            <h4 class="fw-bold mb-0 text-dark">Staff Tour Logs</h4>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadDiaries()">🔄 Refresh</button>
+        </div>
+
+        <div class="row g-4" id="diary-list">
+            <div class="text-center text-muted py-5 w-100">Loading tour diaries...</div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+        const token = localStorage.getItem('token');
+        
+        if (localStorage.getItem('role') !== 'admin') window.location.href = 'login.html';
+
+        async function loadDiaries() {
+            try {
+                const res = await fetch(`${SERVER_URL}/api/tourdiary/admin`, { 
+                    headers: {'Authorization': `Bearer ${token}`} 
+                });
+                const data = await res.json();
+                const list = document.getElementById('diary-list');
+                
+                if(data.length === 0) {
+                    list.innerHTML = '<div class="col-12 text-center text-muted py-4">No tour diaries submitted yet.</div>';
+                    return;
+                }
+
+                list.innerHTML = data.map(entry => {
+                    const isPending = entry.status === 'Pending';
+                    const borderClass = isPending ? 'border-pending' : 'border-reviewed';
+                    const badge = isPending ? '<span class="badge bg-warning text-dark">Needs Review</span>' : '<span class="badge bg-success">Reviewed</span>';
+                    
+                    // If pending, show input field to write a review. If reviewed, just show the text.
+                    const reviewSection = isPending ? `
+                        <div class="mt-3 pt-3 border-top">
+                            <textarea id="review-${entry._id}" class="form-control mb-2 bg-light" rows="2" placeholder="Write admin comments here..."></textarea>
+                            <button class="btn btn-success w-100 fw-bold shadow-sm" onclick="submitReview('${entry._id}')">Save Review</button>
+                        </div>
+                    ` : `
+                        <div class="mt-3 pt-3 border-top bg-light p-2 rounded">
+                            <strong class="d-block small text-success mb-1">Your Review:</strong>
+                            <span class="small text-dark">${entry.adminReview}</span>
+                        </div>
+                    `;
+
+                    return `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card shadow-sm border-0 h-100 ${borderClass}">
+                                <div class="card-body d-flex flex-column p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <h6 class="fw-bold text-primary mb-0">@${entry.staffName}</h6>
+                                            <small class="text-muted fw-bold">${entry.dateString}</small>
+                                        </div>
+                                        ${badge}
+                                    </div>
+                                    
+                                    <p class="small text-danger fw-bold mb-2">📍 ${entry.location}</p>
+                                    <p class="text-dark flex-grow-1 small" style="white-space: pre-wrap;">${entry.activities}</p>
+                                    
+                                    ${reviewSection}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch(e) {
+                document.getElementById('diary-list').innerHTML = '<div class="col-12 text-danger text-center">Failed to load data.</div>';
+            }
+        }
+
+        async function submitReview(id) {
+            const reviewText = document.getElementById(`review-${id}`).value;
+            if(!reviewText.trim()) {
+                alert("Please write a comment before saving.");
+                return;
+            }
+
+            try {
+                await fetch(`${SERVER_URL}/api/tourdiary/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ adminReview: reviewText })
+                });
+                loadDiaries(); 
+            } catch(e) {
+                alert("Error saving review.");
+            }
+        }
+
+        window.onload = loadDiaries;
+    </script>
+</body>
+</html>
