@@ -8,30 +8,44 @@
     <style>
         :root { --msg-green: #2e7d32; }
         .sidebar { min-height: 100vh; background: var(--msg-green); color: white; padding: 20px; }
-        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; }
+        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; transition: 0.2s; }
+        .nav-link:hover { opacity: 1; padding-left: 5px; }
+        .task-card { transition: 0.2s; }
+        .task-card:hover { background-color: #f8f9fa; }
     </style>
 </head>
 <body class="bg-light">
     <div class="container-fluid">
         <div class="row">
-            <nav class="col-md-2 sidebar">
-                <div class="text-center mb-3">
-                    <img src="logo.png" alt="MSGCPPL" style="max-width: 80px; margin-bottom: 10px;">
-                    <h4 class="text-white">MSGCPPL</h4>
+            <nav class="col-md-2 sidebar shadow">
+                <div class="text-center mb-4 border-bottom border-success pb-3">
+                    <img src="logo.png" alt="MSGCPPL" style="max-width: 70px; margin-bottom: 10px;">
+                    <h5 class="text-white fw-bold mb-0">MSGCPPL</h5>
                 </div>
-                <div class="nav flex-column mt-4">
-                    <a class="nav-link" href="employee-portal.html">⬅ Back to Hub</a>
+                <div class="nav flex-column">
+                    <a class="nav-link" href="employee-portal.html">🏠 Home Hub</a>
+                    <a class="nav-link fw-bold" style="opacity: 1;" href="staff-tasks.html">📋 Assigned Tasks</a>
+                    <a class="nav-link" href="staff-attendance.html">📅 Attendance</a>
+                    <a class="nav-link" href="staff-approval.html">✅ Special Approval</a>
+                    <a class="nav-link" href="tourdiary.html">✈️ Tour Diary</a>
+                    <a class="nav-link" href="staff-expense.html">💰 Expense Diary</a>
+                    <a class="nav-link text-warning mt-5 fw-bold" href="#" onclick="localStorage.clear(); window.location.href='login.html'">🚪 Logout</a>
                 </div>
             </nav>
             
             <main class="col-md-10 p-4">
-                <div class="d-flex justify-content-between border-bottom pb-2 mb-4">
-                    <h3>Assigned Tasks</h3>
-                    <span class="badge bg-success p-2">Logged in as: <span id="user-display">...</span></span>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <h3 class="fw-bold mb-0 text-primary">Assigned Tasks</h3>
+                    <span class="badge bg-success p-2 fs-6 shadow-sm">User: <span id="user-display">...</span></span>
                 </div>
+
                 <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white fw-bold">My Pending & Completed Work</div>
-                    <div class="card-body" id="staff-task-list">Loading tasks...</div>
+                    <div class="card-header bg-dark text-white fw-bold p-3">
+                        My Pending & Completed Work
+                    </div>
+                    <div class="card-body p-0" id="staff-task-list">
+                        <div class="text-center p-4 text-muted">Loading tasks...</div>
+                    </div>
                 </div>
             </main>
         </div>
@@ -56,26 +70,30 @@
                 const container = document.getElementById('staff-task-list');
                 
                 if(logs.length === 0) {
-                    container.innerHTML = '<p class="text-muted text-center py-3">No tasks assigned.</p>';
+                    container.innerHTML = '<p class="text-muted text-center p-4 mb-0">No tasks assigned at the moment.</p>';
                     return;
                 }
 
                 container.innerHTML = '';
                 logs.forEach(log => {
                     const div = document.createElement('div');
-                    div.className = "border-bottom p-3 d-flex justify-content-between align-items-center";
+                    div.className = "border-bottom p-3 d-flex justify-content-between align-items-center task-card";
                     div.innerHTML = `
                         <div>
-                            <span class="badge bg-secondary mb-1">${log.projectName || 'General Site'}</span>
-                            <h6 class="mb-0 fw-bold">${log.task}</h6>
-                            <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
+                            <span class="badge bg-secondary mb-2">${log.projectName || 'General Site'}</span>
+                            <h6 class="mb-1 fw-bold">${log.task}</h6>
+                            <small class="text-muted">Assigned: ${new Date(log.date).toLocaleDateString()}</small>
                         </div>
-                        ${log.status === 'Pending' ? `<button class="btn btn-sm btn-success px-3" onclick="markDone('${log._id}', this)">Complete</button>` : `<span class="badge bg-light text-success border p-2">✔ Done</span>`}
+                        <div>
+                            ${log.status === 'Pending' 
+                                ? `<button class="btn btn-sm btn-success px-4 fw-bold shadow-sm" onclick="markDone('${log._id}', this)">Mark Complete</button>` 
+                                : `<span class="badge bg-white text-success border border-success p-2">✔ Completed</span>`}
+                        </div>
                     `;
                     container.appendChild(div);
                 });
             } catch(e) {
-                document.getElementById('staff-task-list').innerHTML = "Failed to load tasks.";
+                document.getElementById('staff-task-list').innerHTML = "<p class='p-4 text-danger'>Failed to load tasks. Please check your connection.</p>";
             }
         }
 
