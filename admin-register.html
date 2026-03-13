@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Registry | MSGCPPL Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f7f6; }
+        .badge-admin { background-color: #dc3545; color: white; }
+        .badge-staff { background-color: #6c757d; color: white; }
+        .staff-item { transition: 0.2s; }
+        .staff-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark shadow-sm mb-4" style="background-color: #2c3e50;">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="admin-staff.html">⬅ Back to HR Hub</a>
+            <span class="navbar-text text-white fw-bold d-none d-md-block">User Registry Control</span>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 border-top border-dark border-4">
+                    <div class="card-header bg-white fw-bold py-3">Register New Account</div>
+                    <div class="card-body">
+                        <form id="reg-form">
+                            <label class="small fw-bold text-muted mb-1">Full Name</label>
+                            <input type="text" id="rf" class="form-control mb-3 bg-light" placeholder="Ex: John Doe" required>
+                            
+                            <label class="small fw-bold text-muted mb-1">Username</label>
+                            <input type="text" id="ru" class="form-control mb-3 bg-light" placeholder="Ex: john123" required>
+                            
+                            <label class="small fw-bold text-muted mb-1">Password</label>
+                            <input type="password" id="rp" class="form-control mb-3 bg-light" placeholder="••••••••" required>
+                            
+                            <label class="small fw-bold text-muted mb-1">Assign Role</label>
+                            <select id="rr" class="form-select mb-4 bg-light">
+                                <option value="staff" selected>Regular Staff</option>
+                                <option value="admin">System Admin</option>
+                            </select>
+
+                            <button type="submit" class="btn btn-dark w-100 fw-bold py-2 shadow-sm">Create Account</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h4 class="fw-bold mb-0 text-dark">Staff Directory</h4>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadStaff()">🔄 Refresh</button>
+                </div>
+                <div id="staff-list" class="row g-2">
+                    <div class="text-center text-muted py-3">Loading directory...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SERVER_URL = "https://msgcppl-backend.onrender.com";
+    const token = localStorage.getItem('token');
+    
+    if (localStorage.getItem('role') !== 'admin') window.location.href = "login.html";
+
+    async function loadStaff() {
+        try {
+            const res = await fetch(`${SERVER_URL}/api/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const users = await res.json();
+            const container = document.getElementById('staff-list');
+            container.innerHTML = '';
+            
+            users.forEach(user => {
+                const roleBadge = user.role === 'admin' ? 'badge-admin' : 'badge-staff';
+                const col = document.createElement('div');
+                col.className = "col-md-6";
+                col.innerHTML = `
+                    <div class="p-3 border rounded bg-white d-flex justify-content-between align-items-center shadow-sm staff-item">
+                        <div>
+                            <strong class="text-primary d-block mb-1">${user.fullName}</strong> 
+                            <span class="badge ${roleBadge}" style="font-size: 0.7rem;">${user.role.toUpperCase()}</span>
+                            <small class="text-muted ms-1">@${user.username}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger border-0 fw-bold" onclick="deleteUser('${user.username}')">Delete</button>
+                    </div>`;
+                container.appendChild(col);
+            });
+        } catch (e) {
+            document.getElementById('staff-list').innerHTML = '<div class="text-danger w-100 text-center">Failed to load directory.</div>';
+        }
+    }
+
+    document.getElementById('reg-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const res = await fetch(`${SERVER_URL}/api/register-staff`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ 
+                fullName: document.getElementById('rf').value, 
+                username: document.getElementById('ru').value, 
+                password: document.getElementById('rp').value,
+                role: document.getElementById('rr').value 
+            })
+        });
+        
+        if(res.ok) {
+            document.getElementById('rf').value = document.getElementById('ru').value = document.getElementById('rp').value = ''; 
+            document.getElementById('rr').value = 'staff';
+            loadStaff();
+            alert("Account registered successfully!");
+        } else {
+            const errData = await res.json();
+            alert("Error: " + errData.error);
+        }
+    };
+
+    async function deleteUser(username) {
+        if(confirm(`Permanently delete account @${username}?`)) {
+            await fetch(`${SERVER_URL}/api/users/${username}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            loadStaff();
+        }
+    }
+
+    window.onload = loadStaff;
+</script>
+</body>
+</html>
