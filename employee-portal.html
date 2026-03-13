@@ -8,7 +8,21 @@
     <style>
         :root { --msg-green: #2e7d32; }
         .sidebar { min-height: 100vh; background: var(--msg-green); color: white; padding: 20px; }
-        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; }
+        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; transition: 0.2s; }
+        .nav-link:hover { opacity: 1; padding-left: 5px; }
+        .dashboard-btn { 
+            height: 120px; 
+            border-radius: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            transition: 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .dashboard-btn:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.15); }
     </style>
 </head>
 <body class="bg-light">
@@ -16,73 +30,67 @@
         <div class="row">
             <nav class="col-md-2 sidebar">
                 <div class="text-center mb-3">
-    <img src="logo.png" alt="MSGCPPL" style="max-width: 80px; margin-bottom: 10px;">
-    <h4 class="text-white">MSGCPPL</h4>
-</div>
+                    <img src="logo.png" alt="MSGCPPL" style="max-width: 80px; margin-bottom: 10px;">
+                    <h4 class="text-white">MSGCPPL</h4>
+                </div>
                 <div class="nav flex-column mt-4">
-                    <a class="nav-link" href="employee-portal.html">🏠 Dashboard</a>
+                    <a class="nav-link fw-bold" style="opacity: 1;" href="employee-portal.html">🏠 Home Hub</a>
+                    <a class="nav-link" href="staff-tasks.html">📋 Assigned Tasks</a>
                     <a class="nav-link" href="staff-attendance.html">📅 Attendance</a>
-                    <a class="nav-link text-danger mt-5" href="#" onclick="localStorage.clear(); window.location.href='login.html'">Logout</a>
+                    <a class="nav-link" href="staff-approval.html">✅ Special Approval</a>
+                    <a class="nav-link" href="tourdiary.html">✈️ Tour Diary</a>
+                    <a class="nav-link" href="staff-expense.html">💰 Expense Diary</a>
+                    <a class="nav-link text-warning mt-5 fw-bold" href="#" onclick="localStorage.clear(); window.location.href='login.html'">🚪 Logout</a>
                 </div>
             </nav>
+
             <main class="col-md-10 p-4">
-                <div class="d-flex justify-content-between border-bottom pb-2 mb-4">
-                    <h3>Staff Portal</h3>
-                    <span class="badge bg-success p-2">Logged in as: <span id="user-display">...</span></span>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
+                    <h3 class="fw-bold mb-0 text-dark">Staff Portal</h3>
+                    <span class="badge bg-success p-2 fs-6">Logged in as: <span id="user-display">...</span></span>
                 </div>
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white fw-bold">My Site Tasks</div>
-                    <div class="card-body" id="staff-task-list">Loading...</div>
+
+                <div class="row g-4">
+                    <div class="col-md-4 col-sm-6">
+                        <button class="btn btn-primary w-100 dashboard-btn" onclick="window.location.href='staff-tasks.html'">
+                            <span class="fs-1 mb-2">📋</span> Assigned Tasks
+                        </button>
+                    </div>
+                    
+                    <div class="col-md-4 col-sm-6">
+                        <button class="btn btn-success w-100 dashboard-btn" onclick="window.location.href='staff-attendance.html'">
+                            <span class="fs-1 mb-2">📅</span> Attendance
+                        </button>
+                    </div>
+
+                    <div class="col-md-4 col-sm-6">
+                        <button class="btn btn-warning text-dark w-100 dashboard-btn" onclick="window.location.href='staff-approval.html'">
+                            <span class="fs-1 mb-2">✅</span> Special Approval
+                        </button>
+                    </div>
+
+                    <div class="col-md-6 col-sm-6">
+                        <button class="btn btn-info text-dark w-100 dashboard-btn" onclick="window.location.href='tourdiary.html'">
+                            <span class="fs-1 mb-2">✈️</span> Tour Diary
+                        </button>
+                    </div>
+
+                    <div class="col-md-6 col-sm-12">
+                        <button class="btn btn-secondary w-100 dashboard-btn" onclick="window.location.href='staff-expense.html'">
+                            <span class="fs-1 mb-2">💰</span> Expense Diary
+                        </button>
+                    </div>
                 </div>
             </main>
         </div>
     </div>
 
 <script>
-        // 1. Added the live cloud server link
-        const SERVER_URL = "https://msgcppl-backend.onrender.com";
-
         const token = localStorage.getItem('token');
-        const username = localStorage.getItem('username');
         const fullName = localStorage.getItem('fullName');
 
         if (!token) window.location.href = "login.html";
         document.getElementById('user-display').innerText = fullName;
-
-        async function loadTasks() {
-            // 2. Updated fetch to use SERVER_URL and the specific staff query
-            const res = await fetch(`${SERVER_URL}/api/worklogs?staffName=${username}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const logs = await res.json();
-            const container = document.getElementById('staff-task-list');
-            container.innerHTML = logs.length ? '' : 'No tasks assigned.';
-            
-            logs.forEach(log => {
-                const div = document.createElement('div');
-                div.className = "border-bottom p-3 d-flex justify-content-between align-items-center";
-                div.innerHTML = `
-                    <div>
-                        <span class="badge bg-secondary mb-1">${log.projectName || 'General Site'}</span>
-                        <h6 class="mb-0 fw-bold">${log.task}</h6>
-                        <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
-                    </div>
-                    ${log.status === 'Pending' ? `<button class="btn btn-sm btn-success" onclick="markDone('${log._id}')">Complete</button>` : `<span class="badge bg-light text-success border">✔ Done</span>`}
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        async function markDone(id) {
-            // 3. Updated fetch to use SERVER_URL
-            await fetch(`${SERVER_URL}/api/worklogs/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status: "Completed" })
-            });
-            loadTasks();
-        }
-        window.onload = loadTasks;
     </script>
 </body>
 </html>

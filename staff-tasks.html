@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assigned Tasks | MS Green Channel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --msg-green: #2e7d32; }
+        .sidebar { min-height: 100vh; background: var(--msg-green); color: white; padding: 20px; }
+        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 sidebar">
+                <div class="text-center mb-3">
+                    <img src="logo.png" alt="MSGCPPL" style="max-width: 80px; margin-bottom: 10px;">
+                    <h4 class="text-white">MSGCPPL</h4>
+                </div>
+                <div class="nav flex-column mt-4">
+                    <a class="nav-link" href="employee-portal.html">⬅ Back to Hub</a>
+                </div>
+            </nav>
+            
+            <main class="col-md-10 p-4">
+                <div class="d-flex justify-content-between border-bottom pb-2 mb-4">
+                    <h3>Assigned Tasks</h3>
+                    <span class="badge bg-success p-2">Logged in as: <span id="user-display">...</span></span>
+                </div>
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white fw-bold">My Pending & Completed Work</div>
+                    <div class="card-body" id="staff-task-list">Loading tasks...</div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+<script>
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+
+        const token = localStorage.getItem('token');
+        const username = localStorage.getItem('username');
+        const fullName = localStorage.getItem('fullName');
+
+        if (!token) window.location.href = "login.html";
+        document.getElementById('user-display').innerText = fullName;
+
+        async function loadTasks() {
+            try {
+                const res = await fetch(`${SERVER_URL}/api/worklogs?staffName=${username}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const logs = await res.json();
+                const container = document.getElementById('staff-task-list');
+                
+                if(logs.length === 0) {
+                    container.innerHTML = '<p class="text-muted text-center py-3">No tasks assigned.</p>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                logs.forEach(log => {
+                    const div = document.createElement('div');
+                    div.className = "border-bottom p-3 d-flex justify-content-between align-items-center";
+                    div.innerHTML = `
+                        <div>
+                            <span class="badge bg-secondary mb-1">${log.projectName || 'General Site'}</span>
+                            <h6 class="mb-0 fw-bold">${log.task}</h6>
+                            <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
+                        </div>
+                        ${log.status === 'Pending' ? `<button class="btn btn-sm btn-success px-3" onclick="markDone('${log._id}', this)">Complete</button>` : `<span class="badge bg-light text-success border p-2">✔ Done</span>`}
+                    `;
+                    container.appendChild(div);
+                });
+            } catch(e) {
+                document.getElementById('staff-task-list').innerHTML = "Failed to load tasks.";
+            }
+        }
+
+        async function markDone(id, btn) {
+            btn.disabled = true;
+            btn.innerText = "Updating...";
+            await fetch(`${SERVER_URL}/api/worklogs/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ status: "Completed" })
+            });
+            loadTasks();
+        }
+        
+        window.onload = loadTasks;
+    </script>
+</body>
+</html>
