@@ -66,7 +66,7 @@
 
         const token = localStorage.getItem('token');
         const fullName = localStorage.getItem('fullName');
-
+        
         // Security & UI check
         if (!token) window.location.href = "login.html";
         document.getElementById('user-display').innerText = fullName;

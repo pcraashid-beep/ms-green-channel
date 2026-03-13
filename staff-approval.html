@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Special Approvals | MS Green Channel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --msg-green: #2e7d32; }
+        .sidebar { min-height: 100vh; background: var(--msg-green); color: white; padding: 20px; }
+        .nav-link { color: white; opacity: 0.8; margin-bottom: 10px; transition: 0.2s; }
+        .nav-link:hover { opacity: 1; padding-left: 5px; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 sidebar shadow">
+                <div class="text-center mb-4 border-bottom border-success pb-3">
+                    <img src="logo.png" alt="MSGCPPL" style="max-width: 70px; margin-bottom: 10px;">
+                    <h5 class="text-white fw-bold mb-0">MSGCPPL</h5>
+                </div>
+                <div class="nav flex-column">
+                    <a class="nav-link" href="employee-portal.html">🏠 Home Hub</a>
+                    <a class="nav-link" href="staff-tasks.html">📋 Assigned Tasks</a>
+                    <a class="nav-link" href="staff-attendance.html">📅 Attendance</a>
+                    <a class="nav-link fw-bold text-warning" style="opacity: 1;" href="staff-approval.html">✅ Special Approval</a>
+                    <a class="nav-link" href="tourdiary.html">✈️ Tour Diary</a>
+                    <a class="nav-link" href="staff-expense.html">💰 Expense Diary</a>
+                    <a class="nav-link text-warning mt-5 fw-bold" href="#" onclick="localStorage.clear(); window.location.href='login.html'">🚪 Logout</a>
+                </div>
+            </nav>
+
+            <main class="col-md-10 p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <h3 class="fw-bold mb-0" style="color: #d35400;">Special Approvals</h3>
+                    <span class="badge bg-success p-2 fs-6 shadow-sm">User: <span id="user-display">...</span></span>
+                </div>
+
+                <div class="row justify-content-center">
+                    <div class="col-md-8 col-lg-6">
+                        
+                        <div class="card shadow-sm border-0 p-4 mb-4 border-top border-warning border-4">
+                            <h5 class="fw-bold mb-3">Submit a Request</h5>
+                            <form id="approval-form">
+                                <label class="form-label fw-bold text-muted small">Description / Reason</label>
+                                <textarea id="appDesc" class="form-control mb-3 bg-light" rows="4" placeholder="E.g., Requesting funds for equipment repair, leave application, etc." required></textarea>
+
+                                <label class="form-label fw-bold text-muted small">Supporting Document (Optional)</label>
+                                <input type="file" id="appFile" class="form-control mb-4 bg-light" accept="image/*,.pdf">
+
+                                <button type="submit" id="btnSubmit" class="btn btn-warning w-100 py-3 fw-bold shadow-sm">
+                                    ✉️ Send Request to Admin
+                                </button>
+                            </form>
+                        </div>
+
+                        <h6 class="fw-bold text-muted border-bottom pb-2">My Recent Requests</h6>
+                        <div id="approval-list"></div>
+
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+<script>
+        const SERVER_URL = "https://msgcppl-backend.onrender.com";
+        const token = localStorage.getItem('token');
+        const fullName = localStorage.getItem('fullName');
+
+        if (!token) window.location.href = "login.html";
+        document.getElementById('user-display').innerText = fullName;
+
+        // Fetch user's previous requests
+        async function loadApprovals() {
+            const res = await fetch(`${SERVER_URL}/api/approvals/my`, { headers: {'Authorization': `Bearer ${token}`} });
+            const data = await res.json();
+            const list = document.getElementById('approval-list');
+            
+            list.innerHTML = data.length ? data.map(req => `
+                <div class="card mb-2 p-3 border-0 shadow-sm">
+                    <div class="d-flex justify-content-between mb-2">
+                        <small class="text-muted">${new Date(req.date).toLocaleString()}</small>
+                        <span class="badge ${req.status === 'Approved' ? 'bg-success' : req.status === 'Rejected' ? 'bg-danger' : 'bg-warning text-dark'}">${req.status}</span>
+                    </div>
+                    <p class="mb-2 text-dark">${req.description}</p>
+                    ${req.fileUrl ? `<a href="${SERVER_URL}${req.fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary" style="width: fit-content;">📎 View Attached File</a>` : ''}
+                </div>
+            `).join('') : '<p class="text-muted text-center py-2">No requests submitted yet.</p>';
+        }
+
+        // Submit new request
+        document.getElementById('approval-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmit');
+            btn.disabled = true;
+            btn.innerText = "Uploading & Sending...";
+
+            let fileUrl = "";
+            const file = document.getElementById('appFile').files[0];
+
+            try {
+                // Upload file if attached
+                if (file) {
+                    const fd = new FormData(); 
+                    fd.append('file', file);
+                    const upRes = await fetch(`${SERVER_URL}/api/upload-file`, { 
+                        method: 'POST', 
+                        headers: {'Authorization': `Bearer ${token}`}, 
+                        body: fd 
+                    });
+                    fileUrl = (await upRes.json()).url;
+                }
+
+                // Send request data to backend
+                const res = await fetch(`${SERVER_URL}/api/approvals`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+                    body: JSON.stringify({ 
+                        description: document.getElementById('appDesc').value, 
+                        fileUrl: fileUrl 
+                    })
+                });
+
+                if (res.ok) {
+                    alert("Request sent successfully!");
+                    document.getElementById('appDesc').value = '';
+                    document.getElementById('appFile').value = '';
+                    loadApprovals();
+                } else {
+                    alert("Failed to send request.");
+                }
+            } catch (err) {
+                alert("Error connecting to server.");
+            }
+            
+            btn.disabled = false;
+            btn.innerText = "✉️ Send Request to Admin";
+        };
+
+        window.onload = loadApprovals;
+    </script>
+</body>
+</html>
