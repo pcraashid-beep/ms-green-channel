@@ -2,52 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Material Inventory | MSGCPPL</title>
+    <title>Master Inventory Admin | MSGCPPL</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f7f6; }
+        .table-responsive { background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+    </style>
 </head>
-<body class="bg-light">
-    
-    <nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container d-flex justify-content-between">
-            <a class="navbar-brand fw-bold" id="nav-brand" href="management-dashboard.html">⬅ Back to Dashboard</a>
-            <div id="nav-right">
-                <span class="text-white me-3 fw-bold small">User: <span id="user-display" class="text-warning">...</span></span>
-                <button class="btn btn-sm btn-outline-danger d-none fw-bold" id="logout-btn" onclick="localStorage.clear(); window.location.href='login.html'">Logout</button>
-            </div>
+<body>
+    <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="management-dashboard.html">⬅ Back to Dashboard</a>
+            <span class="navbar-text text-white fw-bold">Master Inventory Control</span>
         </div>
     </nav>
 
-    <div class="container">
-        <div class="row">
+    <div class="container mb-5">
+        <div class="row g-4">
             <div class="col-md-4">
-                <div class="card p-3 shadow-sm border-0 border-top border-dark border-4 mb-4">
-                    <h6 class="fw-bold">Update Stock</h6>
-                    <select id="invProj" class="form-select mb-3 bg-light" onchange="refreshList()">
-                        <option>Loading sites...</option>
+                <div class="card p-3 shadow-sm border-0 border-top border-primary border-4 mb-4">
+                    <h5 class="fw-bold mb-3">Define Site Material</h5>
+                    <select id="invProj" class="form-select mb-3 bg-light" onchange="loadData()">
+                        <option value="" disabled selected>Select Site...</option>
                     </select>
                     
-                    <label class="small fw-bold text-muted mb-1">Item Name</label>
-                    <input type="text" id="invItem" class="form-control mb-3 bg-light" placeholder="Ex: Cement, Steel TMT">
-                    
-                    <label class="small fw-bold text-muted mb-1">Quantity & Unit</label>
-                    <div class="input-group mb-4">
-                        <input type="number" id="invQty" class="form-control bg-light" placeholder="Qty (e.g. 50)">
-                        <input type="text" id="invUnit" class="form-control bg-light" placeholder="Unit (Bags/Kg)">
+                    <label class="small fw-bold text-muted mb-1">Material Name & Unit</label>
+                    <div class="input-group mb-3">
+                        <input type="text" id="itemName" class="form-control bg-light" placeholder="Ex: Cement">
+                        <input type="text" id="itemUnit" class="form-control bg-light" placeholder="Unit (Bags)">
                     </div>
+
+                    <label class="small fw-bold text-muted mb-1">Total Required (Freezed)</label>
+                    <input type="number" id="itemReq" class="form-control mb-3 bg-light" placeholder="Ex: 5000">
+
+                    <label class="small fw-bold text-muted mb-1">Total Sent by Admin (Freezed)</label>
+                    <input type="number" id="itemSent" class="form-control mb-4 bg-light" placeholder="Ex: 1000">
                     
-                    <button class="btn btn-primary w-100 fw-bold py-2 shadow-sm" onclick="updateInv()">➕ Add to Stock</button>
+                    <button class="btn btn-primary w-100 fw-bold shadow-sm" onclick="saveAdminItem()">💾 Save to Site</button>
                 </div>
             </div>
             
             <div class="col-md-8">
-                <div class="card p-3 shadow-sm border-0">
-                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                        <h5 class="fw-bold mb-0 text-dark">Current Inventory Levels</h5>
-                        <button class="btn btn-sm btn-dark fw-bold shadow-sm" onclick="loadAllStock()">View All Sites</button>
-                    </div>
-                    <div id="inv-list">
-                        <div class="text-center text-muted py-4">Loading stock data...</div>
-                    </div>
+                <h5 class="fw-bold text-dark mb-2">1. Live Balances</h5>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm mb-0 text-center">
+                        <thead class="table-dark"><tr><th>Material</th><th>Req</th><th>Sent</th><th class="bg-success">Live Balance</th></tr></thead>
+                        <tbody id="overview-table"></tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">2. Detailed Ledger (Storekeeper Logs)</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm mb-0">
+                        <thead class="table-secondary">
+                            <tr><th>Date</th><th>User</th><th>Action</th><th>Item</th><th>Qty</th><th>Details / Reason</th></tr>
+                        </thead>
+                        <tbody id="log-table"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -55,87 +68,68 @@
 
 <script>
         const SERVER_URL = "https://msgcppl-backend.onrender.com";
-
         const token = localStorage.getItem('token');
-        const role = localStorage.getItem('role');
-        const fullName = localStorage.getItem('fullName');
         
-        // Block unauthorized access
-        if (role !== 'admin' && role !== 'storekeeper') {
-            window.location.href = 'login.html';
-        }
-
-        // Adjust UI for Storekeeper vs Admin
-        document.getElementById('user-display').innerText = fullName;
-        if (role === 'storekeeper') {
-            document.getElementById('nav-brand').innerText = '📦 Storekeeper Portal';
-            document.getElementById('nav-brand').href = '#';
-            document.getElementById('logout-btn').classList.remove('d-none');
-        }
+        if (localStorage.getItem('role') !== 'admin') window.location.href = 'login.html';
         
-        async function load() {
+        async function init() {
             const pRes = await fetch(`${SERVER_URL}/api/projects`, { headers: {'Authorization': `Bearer ${token}`} });
-            const projects = await pRes.json();
-            const sel = document.getElementById('invProj');
-            sel.innerHTML = projects.map(p => `<option value="${p._id}">${p.name}</option>`).join('');
-            
-            if(projects.length > 0) refreshList();
-            else document.getElementById('inv-list').innerHTML = "<p class='text-muted'>No projects available.</p>";
+            const projs = await pRes.json();
+            document.getElementById('invProj').innerHTML += projs.map(p => `<option value="${p._id}">${p.name}</option>`).join('');
         }
         
-        async function updateInv() {
-            await fetch(`${SERVER_URL}/api/inventory`, {
+        async function saveAdminItem() {
+            const pId = document.getElementById('invProj').value;
+            if(!pId) return alert("Select a site first.");
+            
+            await fetch(`${SERVER_URL}/api/inventory/admin/item`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
-                body: JSON.stringify({ projectId: invProj.value, itemName: invItem.value, quantity: invQty.value, unit: invUnit.value })
+                body: JSON.stringify({ 
+                    projectId: pId, 
+                    itemName: document.getElementById('itemName').value, 
+                    unit: document.getElementById('itemUnit').value,
+                    totalRequired: document.getElementById('itemReq').value,
+                    totalSent: document.getElementById('itemSent').value
+                })
             });
-            invItem.value = invQty.value = ''; refreshList();
+            alert("Saved!");
+            loadData();
         }
 
-        async function refreshList() {
-            const res = await fetch(`${SERVER_URL}/api/inventory/${invProj.value}`, { headers: {'Authorization': `Bearer ${token}`} });
-            renderInv(await res.json(), false);
+        async function loadData() {
+            const pId = document.getElementById('invProj').value;
+            if(!pId) return;
+
+            // Load Overview
+            const iRes = await fetch(`${SERVER_URL}/api/inventory/items/${pId}`, { headers: {'Authorization': `Bearer ${token}`} });
+            const items = await iRes.json();
+            document.getElementById('overview-table').innerHTML = items.map(i => `
+                <tr><td class="fw-bold text-primary">${i.itemName}</td><td>${i.totalRequired}</td><td>${i.totalSent}</td><td class="fw-bold fs-5 text-success">${i.currentBalance}</td></tr>
+            `).join('');
+
+            // Load Detailed Ledger
+            const logRes = await fetch(`${SERVER_URL}/api/inventory/logs/${pId}`, { headers: {'Authorization': `Bearer ${token}`} });
+            const logs = await logRes.json();
+            document.getElementById('log-table').innerHTML = logs.map(l => {
+                let details = '';
+                if(l.actionType === 'Consumed') details = `<b>To:</b> ${l.issuedTo} | <b>Purp:</b> ${l.purpose}`;
+                if(l.actionType === 'Returned') details = `<b>By:</b> ${l.returnedBy} | <b>Cause:</b> ${l.causeOfReturn} (${l.returnStatus})`;
+                if(l.actionType === 'Received') details = 'N/A';
+
+                return `
+                <tr>
+                    <td class="small text-muted">${new Date(l.date).toLocaleDateString()}</td>
+                    <td class="fw-bold text-danger">@${l.storekeeperName}</td>
+                    <td><span class="badge ${l.actionType==='Received'?'bg-success':l.actionType==='Consumed'?'bg-danger':'bg-info text-dark'}">${l.actionType}</span></td>
+                    <td class="fw-bold">${l.itemName}</td>
+                    <td>${l.quantity}</td>
+                    <td class="small">${details}</td>
+                </tr>`;
+            }).join('');
         }
 
-        async function loadAllStock() {
-            const res = await fetch(`${SERVER_URL}/api/inventory/all`, { headers: {'Authorization': `Bearer ${token}`} });
-            renderInv(await res.json(), true);
-        }
-
-        function renderInv(items, showSite) {
-            document.getElementById('inv-list').innerHTML = items.length ? items.map(i => `
-                <div class="d-flex justify-content-between align-items-center border-bottom py-3">
-                    <div>
-                        ${showSite ? `<span class="badge bg-secondary mb-2">${i.projectName}</span><br>` : ''}
-                        <strong class="text-primary fs-5">${i.itemName}</strong>
-                    </div>
-                    <div class="text-end">
-                        <span class="fw-bold fs-5 text-dark d-block mb-2">${i.quantity} <span class="fs-6 text-muted">${i.unit}</span></span>
-                        <button class="btn btn-sm btn-warning fw-bold px-3 shadow-sm" onclick="consumeStock('${i._id}')">Consume</button>
-                        <button class="btn btn-sm btn-danger px-3 ms-1 shadow-sm" onclick="deleteStock('${i._id}')">🗑</button>
-                    </div>
-                </div>`).join('') : '<p class="text-muted text-center py-4">No stock available.</p>';
-        }
-
-        async function consumeStock(id) {
-            const amt = prompt("Enter quantity to consume from site:");
-            if (amt && !isNaN(amt)) {
-                const res = await fetch(`${SERVER_URL}/api/inventory/consume/${id}`, {
-                    method: 'PUT', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
-                    body: JSON.stringify({ consumeAmount: amt })
-                });
-                if(res.ok) refreshList(); else alert("Error: Insufficient stock.");
-            }
-        }
-
-        async function deleteStock(id) {
-            if(confirm("Delete this inventory item entirely?")) {
-                await fetch(`${SERVER_URL}/api/inventory/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
-                refreshList();
-            }
-        }
-
-        window.onload = load;
+        window.onload = init;
     </script>
 </body>
 </html>

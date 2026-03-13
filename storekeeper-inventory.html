@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storekeeper Desk | MSGCPPL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f7f6; }
+        .table-responsive { background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container">
+            <span class="navbar-brand fw-bold">📦 Site Inventory Manager</span>
+            <div>
+                <span class="text-white me-3 fw-bold small">User: <span id="user-display" class="text-warning"></span></span>
+                <button class="btn btn-sm btn-outline-danger fw-bold" onclick="localStorage.clear(); window.location.href='login.html'">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <div class="row mb-4 align-items-end">
+            <div class="col-md-6">
+                <label class="fw-bold text-muted mb-1">Select Project Site:</label>
+                <select id="projSelect" class="form-select border-dark border-2" onchange="loadSiteData()">
+                    <option value="" disabled selected>Loading sites...</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="workspace" class="hidden">
+            <h5 class="fw-bold text-dark mb-2">1. Material Overview & Balances</h5>
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Material Name</th>
+                            <th>Total Req (Admin)</th>
+                            <th>Sent by Admin</th>
+                            <th class="bg-primary">Current Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="overview-table"></tbody>
+                </table>
+            </div>
+
+            <h5 class="fw-bold text-dark mb-2">2. Record a Transaction</h5>
+            <div class="card shadow-sm border-0 mb-4 p-3 border-top border-primary border-4 bg-white">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="small fw-bold">Action Type</label>
+                        <select id="actionType" class="form-select bg-light" onchange="toggleFormFields()">
+                            <option value="Received">📥 Material Received by Me</option>
+                            <option value="Consumed">📤 Material Consumed</option>
+                            <option value="Returned">🔄 Material Returned to Store</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold">Material Name</label>
+                        <select id="tItem" class="form-select bg-light" required></select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold">Quantity</label>
+                        <input type="number" id="tQty" class="form-control bg-light" required>
+                    </div>
+                    
+                    <div class="col-md-6 consume-field hidden">
+                        <label class="small fw-bold">Purpose / Details</label>
+                        <input type="text" id="tPurpose" class="form-control bg-light">
+                    </div>
+                    <div class="col-md-6 consume-field hidden">
+                        <label class="small fw-bold">Issued To (Name)</label>
+                        <input type="text" id="tIssuedTo" class="form-control bg-light">
+                    </div>
+
+                    <div class="col-md-4 return-field hidden">
+                        <label class="small fw-bold">Returned By</label>
+                        <input type="text" id="tReturnedBy" class="form-control bg-light">
+                    </div>
+                    <div class="col-md-4 return-field hidden">
+                        <label class="small fw-bold">Cause of Return</label>
+                        <input type="text" id="tCause" class="form-control bg-light">
+                    </div>
+                    <div class="col-md-4 return-field hidden">
+                        <label class="small fw-bold">Status</label>
+                        <select id="tRetStatus" class="form-select bg-light">
+                            <option>Reusable</option>
+                            <option>Unusable</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <button class="btn btn-primary w-100 fw-bold py-2 shadow-sm" onclick="submitTransaction()">Submit Entry</button>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="fw-bold text-dark mb-2">3. Site Ledger (Recent)</h5>
+            <div class="table-responsive">
+                <table class="table table-striped table-sm mb-0">
+                    <thead class="table-secondary">
+                        <tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Bal</th><th>Stamp</th></tr>
+                    </thead>
+                    <tbody id="log-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SERVER_URL = "https://msgcppl-backend.onrender.com";
+    const token = localStorage.getItem('token');
+    
+    if (localStorage.getItem('role') !== 'storekeeper' && localStorage.getItem('role') !== 'admin') window.location.href = "login.html";
+    document.getElementById('user-display').innerText = localStorage.getItem('username');
+
+    let currentItems = [];
+
+    async function init() {
+        const res = await fetch(`${SERVER_URL}/api/projects`, { headers: {'Authorization': `Bearer ${token}`} });
+        const projs = await res.json();
+        const sel = document.getElementById('projSelect');
+        sel.innerHTML = '<option value="" disabled selected>-- Choose a Site --</option>' + projs.map(p => `<option value="${p._id}">${p.name}</option>`).join('');
+    }
+
+    async function loadSiteData() {
+        document.getElementById('workspace').classList.remove('hidden');
+        const pId = document.getElementById('projSelect').value;
+        
+        // 1. Load Overview Items
+        const res = await fetch(`${SERVER_URL}/api/inventory/items/${pId}`, { headers: {'Authorization': `Bearer ${token}`} });
+        currentItems = await res.json();
+        
+        document.getElementById('overview-table').innerHTML = currentItems.length ? currentItems.map(i => `
+            <tr>
+                <td class="fw-bold text-primary">${i.itemName}</td>
+                <td>${i.totalRequired} ${i.unit}</td>
+                <td>${i.totalSent} ${i.unit}</td>
+                <td class="fw-bold fs-5 text-success">${i.currentBalance} ${i.unit}</td>
+            </tr>
+        `).join('') : '<tr><td colspan="4" class="text-center text-muted">Admin has not added any materials to this site yet.</td></tr>';
+
+        // 2. Populate Dropdown
+        document.getElementById('tItem').innerHTML = currentItems.map(i => `<option value="${i._id}">${i.itemName} (${i.unit})</option>`).join('');
+
+        // 3. Load Logs
+        const logRes = await fetch(`${SERVER_URL}/api/inventory/logs/${pId}`, { headers: {'Authorization': `Bearer ${token}`} });
+        const logs = await logRes.json();
+        document.getElementById('log-table').innerHTML = logs.map(l => `
+            <tr>
+                <td>${new Date(l.date).toLocaleDateString()}</td>
+                <td><span class="badge ${l.actionType==='Received'?'bg-success':l.actionType==='Consumed'?'bg-danger':'bg-info text-dark'}">${l.actionType}</span></td>
+                <td class="fw-bold">${l.itemName}</td>
+                <td>${l.quantity}</td>
+                <td class="fw-bold text-primary">${l.balanceAfter}</td>
+                <td class="small text-muted">@${l.storekeeperName}</td>
+            </tr>
+        `).join('');
+    }
+
+    function toggleFormFields() {
+        const type = document.getElementById('actionType').value;
+        document.querySelectorAll('.consume-field').forEach(e => e.classList.toggle('hidden', type !== 'Consumed'));
+        document.querySelectorAll('.return-field').forEach(e => e.classList.toggle('hidden', type !== 'Returned'));
+    }
+
+    async function submitTransaction() {
+        const pId = document.getElementById('projSelect').value;
+        const itemId = document.getElementById('tItem').value;
+        const qty = document.getElementById('tQty').value;
+        const type = document.getElementById('actionType').value;
+
+        if(!pId || !itemId || !qty) return alert("Please fill mandatory fields.");
+
+        const payload = { projectId: pId, itemId: itemId, actionType: type, quantity: qty };
+
+        if (type === 'Consumed') {
+            payload.purpose = document.getElementById('tPurpose').value;
+            payload.issuedTo = document.getElementById('tIssuedTo').value;
+        } else if (type === 'Returned') {
+            payload.returnedBy = document.getElementById('tReturnedBy').value;
+            payload.causeOfReturn = document.getElementById('tCause').value;
+            payload.returnStatus = document.getElementById('tRetStatus').value;
+        }
+
+        const res = await fetch(`${SERVER_URL}/api/inventory/transaction`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+            body: JSON.stringify(payload)
+        });
+
+        if(res.ok) {
+            alert("Entry Saved! Balance Updated.");
+            document.getElementById('tQty').value = document.getElementById('tPurpose').value = document.getElementById('tIssuedTo').value = document.getElementById('tReturnedBy').value = document.getElementById('tCause').value = '';
+            loadSiteData(); // Refresh UI
+        } else {
+            const err = await res.json();
+            alert("Error: " + err.error);
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
