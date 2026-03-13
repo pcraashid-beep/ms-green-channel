@@ -2,118 +2,457 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Contractors | MS Green Channel</title>
+    <title>Sub-Contractors | MS Green Channel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f7f6; }
+        .hidden { display: none !important; }
+        .card { transition: 0.2s; border-radius: 12px; }
+        
+        /* INVOICE PRINT STYLES */
+        .invoice-box { background: white; padding: 40px; border: 1px solid #ccc; font-size: 13px; }
+        .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border: 2px solid #000; }
+        .inv-table th, .inv-table td { border: 1px solid #000; padding: 6px; text-align: left; }
+        .inv-input { border: none; border-bottom: 1px dashed #ccc; width: 100%; background: transparent; outline: none; }
+        .inv-num { text-align: right; width: 100px; }
+        .calc-amt { background: #fdfdfd; }
+        
+        @media print {
+            body { background: white; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            .invoice-box { border: none; padding: 0; margin-top: 0; }
+            .inv-input { border-bottom: none; }
+            @page { margin: 0.5cm; }
+        }
+    </style>
 </head>
-<body class="bg-light">
-    <nav class="navbar navbar-dark bg-secondary mb-4 shadow-sm">
+<body>
+    <nav class="navbar navbar-dark bg-secondary mb-4 shadow-sm no-print">
         <div class="container">
             <a class="navbar-brand fw-bold" href="management-dashboard.html">⬅ Dashboard</a>
-            <span class="navbar-text text-white fw-bold">Sub-Contractor Registry</span>
+            <span class="navbar-text text-white fw-bold">Sub-Contractor Registry & Billing</span>
         </div>
     </nav>
-    <div class="container">
-        <div class="row">
-            <div class="col-md-4">
+
+    <div class="container mb-5" id="main-view">
+        <div class="row g-4">
+            <div class="col-md-4 no-print">
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-dark text-white fw-bold">New Contractor Entry</div>
-                    <div class="card-body">
+                    <div class="card-body bg-white">
                         <form id="c-form">
-                            <label class="small fw-bold">Contractor Name</label>
-                            <input type="text" id="cN" class="form-control mb-2" placeholder="e.g. ABC Constructions" required>
-                            
-                            <label class="small fw-bold">Start Date</label>
-                            <input type="date" id="cS" class="form-control mb-2" required>
-                            
-                            <label class="small fw-bold">Upload Work Order (PDF/Image)</label>
-                            <input type="file" id="cFile" class="form-control mb-3" accept=".pdf,image/*">
-                            
-                            <button class="btn btn-secondary w-100 fw-bold" id="saveBtn">Add Contractor</button>
+                            <input type="text" id="cN" class="form-control mb-2 bg-light" placeholder="Contractor Name" required>
+                            <input type="date" id="cS" class="form-control mb-2 bg-light" required title="Start Date">
+                            <input type="text" id="cAdd" class="form-control mb-2 bg-light" placeholder="Full Address" required>
+                            <input type="text" id="cPan" class="form-control mb-2 bg-light" placeholder="PAN Number" required>
+                            <input type="text" id="cGst" class="form-control mb-3 bg-light" placeholder="GSTIN Number" required>
+                            <label class="small fw-bold text-muted">Upload Work Order (PDF/Image)</label>
+                            <input type="file" id="cFile" class="form-control mb-3 bg-light" accept=".pdf,image/*">
+                            <button class="btn btn-secondary w-100 fw-bold shadow-sm" id="saveBtn">Add Contractor</button>
                         </form>
                     </div>
                 </div>
             </div>
-            <div class="col-md-8">
-                <h4 class="fw-bold text-secondary">Active Contractors</h4>
+
+            <div class="col-md-8 no-print">
+                <h4 class="fw-bold text-secondary mb-3">Active Contractors</h4>
                 <div id="c-list"></div>
             </div>
         </div>
     </div>
-<script>
-        // 1. Added the live cloud server link
-        const SERVER_URL = "https://msgcppl-backend.onrender.com";
 
-        const token = localStorage.getItem('token');
-        if (!token) window.location.href = "login.html";
+    <div class="container mb-5 hidden" id="workspace-view">
+        <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+            <button class="btn btn-outline-secondary fw-bold" onclick="showMainView()">⬅ Back to Directory</button>
+            <h4 class="fw-bold mb-0 text-primary" id="ws-name">Contractor Name</h4>
+        </div>
 
-        async function load() {
-            // Updated fetch to use SERVER_URL
-            const res = await fetch(`${SERVER_URL}/api/contractors`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const list = await res.json();
-            const container = document.getElementById('c-list');
-            container.innerHTML = list.length ? '' : '<p class="text-muted">No contractors recorded yet.</p>';
-            
-            list.forEach(c => {
-                const div = document.createElement('div');
-                div.className = "card mb-2 p-3 border-0 shadow-sm d-flex flex-row justify-content-between align-items-center";
-                div.innerHTML = `
-                    <div>
-                        <h6 class="mb-0 fw-bold">${c.name}</h6>
-                        <small class="text-muted">Started: ${c.startDate}</small>
+        <div class="row g-4 no-print">
+            <div class="col-md-12">
+                <div class="card border-0 shadow-sm border-top border-primary border-4 p-4">
+                    <h5 class="fw-bold border-bottom pb-2">Financial Ledger</h5>
+                    
+                    <div class="row text-center mb-4">
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded border border-dark">
+                                <h6 class="text-muted text-uppercase small fw-bold">Allotted Amount</h6>
+                                <h4 class="text-dark fw-bold mb-2">₹<span id="l-allot">0</span></h4>
+                                <button class="btn btn-sm btn-dark" onclick="updateAllotment()">Edit Allotment</button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded border border-success">
+                                <h6 class="text-muted text-uppercase small fw-bold">Total Billed (Gross)</h6>
+                                <h4 class="text-success fw-bold mt-2">₹<span id="l-billed">0</span></h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded border border-danger">
+                                <h6 class="text-muted text-uppercase small fw-bold">Pending Amount</h6>
+                                <h4 class="text-danger fw-bold mt-2">₹<span id="l-pending">0</span></h4>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        ${c.workOrderUrl ? `<a href="${c.workOrderUrl}" target="_blank" class="btn btn-sm btn-outline-primary">View PDF</a>` : '<span class="text-muted small">No File</span>'}
-                        <button class="btn btn-sm btn-danger ms-2" onclick="del('${c._id}')">Delete</button>
-                    </div>`;
-                container.appendChild(div);
-            });
+
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                        <h6 class="fw-bold mb-0">Bill History</h6>
+                        <button class="btn btn-success fw-bold shadow-sm" onclick="showInvoiceForm()">➕ Create New Tax Invoice</button>
+                    </div>
+                    <table class="table table-striped table-bordered table-sm text-center align-middle">
+                        <thead class="table-dark"><tr><th>Date</th><th>Bill No</th><th>Project</th><th>Gross Bill</th><th>Deductions</th><th class="text-success">Net Paid</th></tr></thead>
+                        <tbody id="bill-history-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container hidden" id="invoice-view">
+        <div class="mb-3 text-end no-print">
+            <button class="btn btn-secondary me-2 fw-bold" onclick="closeInvoice()">Cancel</button>
+            <button class="btn btn-primary fw-bold shadow-sm" onclick="saveAndPrintInvoice()">💾 Save to Ledger & Print PDF</button>
+        </div>
+
+        <div class="invoice-box shadow-sm mb-5" id="printable-invoice">
+            
+            <div class="text-center mb-3">
+                <h3 class="fw-bold mb-1">MS GREEN CHANNEL POWER PRIVATE LIMITED</h3>
+                <p class="mb-0 fw-bold">THATHRI CHINAR MOHALLA THATHRI, DISTRICT DODA (JAMMU & KASHMIR), 182203</p>
+                <p class="fw-bold mb-0">GSTIN NO.: 01AASCM4425A1ZX &nbsp;&nbsp;|&nbsp;&nbsp; PAN NO.: AASCM4425A</p>
+            </div>
+
+            <div class="mb-2 fw-bold">
+                Name of Project: <input type="text" class="inv-input w-50" id="inv-proj" placeholder="Enter Project Description">
+            </div>
+
+            <div class="text-center border-top border-bottom border-dark py-2 mb-3">
+                <h5 class="fw-bold mb-0 text-uppercase">Tax Invoice</h5>
+            </div>
+
+            <table class="inv-table">
+                <thead class="text-center">
+                    <tr><th width="5%">No.</th><th width="35%">Detail</th><th width="45%">Description</th><th width="15%">Dated</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="text-center">1.1</td><td>Work order No. & Date</td><td><input type="text" class="inv-input"></td><td><input type="date" class="inv-input"></td></tr>
+                    <tr><td class="text-center">1.2</td><td>Work order Amendment No. & Date</td><td><input type="text" class="inv-input"></td><td><input type="date" class="inv-input"></td></tr>
+                    <tr><td class="text-center">1.3</td><td>Work order Amount (Orignal & Amended)</td><td><input type="text" class="inv-input"></td><td></td></tr>
+                    <tr><td class="text-center">1.4</td><td>Work order Approval status (HO/CO/site)</td><td><input type="text" class="inv-input"></td><td></td></tr>
+                    <tr><td class="text-center">1.5</td><td>SC work period From and To</td><td><input type="text" class="inv-input" placeholder="From Date - To Date"></td><td></td></tr>
+                </tbody>
+            </table>
+
+            <table class="inv-table">
+                <tbody>
+                    <tr><td width="5%" class="text-center">2.1</td><td width="35%">Name of Sub Contractor</td><td width="30%" id="inv-sc-name" class="fw-bold"></td><td width="30%"><input type="text" class="inv-input" placeholder="Description"></td></tr>
+                    <tr><td class="text-center">2.2</td><td>Address of Sub Contractor</td><td id="inv-sc-add"></td><td><input type="text" class="inv-input" placeholder="Description"></td></tr>
+                    <tr><td class="text-center">2.3</td><td>PAN of Sub Contractor</td><td id="inv-sc-pan" class="fw-bold"></td><td><input type="text" class="inv-input" placeholder="Description"></td></tr>
+                    <tr><td class="text-center">2.4</td><td>GST of Sub-contractor</td><td id="inv-sc-gst" class="fw-bold"></td><td><input type="text" class="inv-input" placeholder="Description"></td></tr>
+                </tbody>
+            </table>
+
+            <div class="mb-3 fw-bold">
+                Contractors bill detail From: <input type="date" class="inv-input" style="width:130px;"> To: <input type="date" class="inv-input" style="width:130px;">
+            </div>
+
+            <div class="text-center fw-bold border border-dark border-bottom-0 py-1 text-uppercase bg-light">
+                Earnings / Gross Bill
+            </div>
+            <table class="inv-table mb-0 border-top-0">
+                <thead class="text-center small">
+                    <tr><th width="5%">S.No</th><th width="35%">Description</th><th width="15%">Reference</th><th>Upto Prev Bill (₹)</th><th>For This Bill (₹)</th><th>Upto This Bill (₹)</th></tr>
+                </thead>
+                <tbody id="earn-body">
+                    </tbody>
+                <tfoot class="fw-bold">
+                    <tr><td colspan="3" class="text-end">GROSS TOTAL VALUE (Including GST)</td>
+                    <td><input type="number" class="inv-input inv-num" id="gt-prev" readonly></td>
+                    <td><input type="number" class="inv-input inv-num" id="gt-this" readonly></td>
+                    <td><input type="number" class="inv-input inv-num" id="gt-upto" readonly></td></tr>
+                </tfoot>
+            </table>
+
+            <div class="text-center fw-bold border border-dark border-bottom-0 border-top-0 py-1 mt-3 text-uppercase bg-light">
+                Deduction & Recoveries
+            </div>
+            <table class="inv-table border-top-0">
+                <thead class="text-center small d-none">
+                    <tr><th width="5%">S.No</th><th width="35%">Description</th><th width="15%">Reference</th><th>Upto Prev Bill (₹)</th><th>For This Bill (₹)</th><th>Upto This Bill (₹)</th></tr>
+                </thead>
+                <tbody id="ded-body">
+                    </tbody>
+                <tfoot class="fw-bold">
+                    <tr><td colspan="3" class="text-end">TOTAL DEDUCTION</td>
+                    <td><input type="number" class="inv-input inv-num" id="td-prev" readonly></td>
+                    <td><input type="number" class="inv-input inv-num" id="td-this" readonly></td>
+                    <td><input type="number" class="inv-input inv-num" id="td-upto" readonly></td></tr>
+                    
+                    <tr><td colspan="3" class="text-end">Release against hold Amount</td>
+                    <td><input type="number" class="inv-input inv-num calc-amt" id="ra-prev" oninput="calcTotals()"></td>
+                    <td><input type="number" class="inv-input inv-num calc-amt" id="ra-this" oninput="calcTotals()"></td>
+                    <td><input type="number" class="inv-input inv-num" id="ra-upto" readonly></td></tr>
+                    
+                    <tr><td colspan="3" class="text-end text-uppercase fs-6">Net Amount For Payment</td>
+                    <td><input type="number" class="inv-input inv-num" id="net-prev" readonly></td>
+                    <td><input type="number" class="inv-input inv-num" id="net-this" readonly></td>
+                    <td><input type="number" class="inv-input inv-num" id="net-upto" readonly></td></tr>
+                </tfoot>
+            </table>
+
+            <div class="mb-4 p-2 border border-dark">
+                <strong>Net amount for payment (in words): </strong>
+                <span id="amt-words" class="fw-bold text-uppercase ms-2">ZERO RUPEES ONLY</span>
+            </div>
+
+            <div class="row text-center mt-5 pt-5 pb-2">
+                <div class="col-3"><strong>Prepared By</strong></div>
+                <div class="col-3"><strong>Checked By</strong></div>
+                <div class="col-3"><strong>Certified By</strong></div>
+                <div class="col-3"><strong>Authorized Signatory</strong></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SERVER_URL = "https://msgcppl-backend.onrender.com";
+    const token = localStorage.getItem('token');
+    if (!token || localStorage.getItem('role') !== 'admin') window.location.href = "login.html";
+
+    let activeSC = null;
+
+    // --- 1. CONTRACTOR CRUD ---
+    async function load() {
+        const res = await fetch(`${SERVER_URL}/api/contractors`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const list = await res.json();
+        const container = document.getElementById('c-list');
+        container.innerHTML = list.length ? '' : '<p class="text-muted bg-white p-3 rounded shadow-sm border">No contractors recorded yet.</p>';
+        
+        list.forEach(c => {
+            const div = document.createElement('div');
+            div.className = "card mb-3 p-3 border-0 shadow-sm border-start border-dark border-4";
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0 fw-bold text-primary">${c.name}</h5>
+                    <button class="btn btn-sm btn-dark fw-bold px-3 shadow-sm" onclick='openWorkspace(${JSON.stringify(c).replace(/'/g, "&apos;")})'>💼 Ledger & Bills</button>
+                </div>
+                <div class="small text-dark fw-bold mb-2">
+                    📍 ${c.address || 'N/A'} &nbsp;|&nbsp; PAN: ${c.pan || 'N/A'} &nbsp;|&nbsp; GSTIN: ${c.gstin || 'N/A'}
+                </div>
+                <div>
+                    ${c.workOrderUrl ? `<a href="${SERVER_URL}${c.workOrderUrl}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">📄 View WO</a>` : '<span class="text-muted small border px-2 py-1 rounded">No WO File</span>'}
+                    <button class="btn btn-sm btn-outline-danger ms-2 fw-bold" onclick="del('${c._id}')">🗑️ Delete</button>
+                </div>`;
+            container.appendChild(div);
+        });
+    }
+
+    document.getElementById('c-form').onsubmit = async (e) => {
+        e.preventDefault();
+        document.getElementById('saveBtn').disabled = true;
+
+        let fileUrl = "";
+        const fileInput = document.getElementById('cFile');
+        if (fileInput.files.length > 0) {
+            const fd = new FormData(); fd.append('workOrder', fileInput.files[0]);
+            const upRes = await fetch(`${SERVER_URL}/api/upload-work-order`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+            fileUrl = (await upRes.json()).url;
         }
 
-        document.getElementById('c-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const saveBtn = document.getElementById('saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.innerText = "Processing...";
+        await fetch(`${SERVER_URL}/api/contractors`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ 
+                name: document.getElementById('cN').value, startDate: document.getElementById('cS').value, 
+                address: document.getElementById('cAdd').value, pan: document.getElementById('cPan').value, gstin: document.getElementById('cGst').value,
+                workOrderUrl: fileUrl 
+            })
+        });
+        location.reload();
+    };
 
-            let fileUrl = "";
-            const fileInput = document.getElementById('cFile');
-
-            // Step 1: Upload File if it exists
-            if (fileInput.files.length > 0) {
-                const formData = new FormData();
-                formData.append('workOrder', fileInput.files[0]);
-                // Updated fetch to use SERVER_URL
-                const uploadRes = await fetch(`${SERVER_URL}/api/upload-work-order`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                });
-                const uploadData = await uploadRes.json();
-                fileUrl = uploadData.url;
-            }
-
-            // Step 2: Save Data to MongoDB
-            // Updated fetch to use SERVER_URL
-            await fetch(`${SERVER_URL}/api/contractors`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ name: cN.value, startDate: cS.value, workOrderUrl: fileUrl })
-            });
-
-            saveBtn.disabled = false;
-            saveBtn.innerText = "Add Contractor";
-            cN.value = cS.value = cFile.value = '';
+    async function del(id) {
+        if(confirm("Remove this contractor and ALL their billing history?")) {
+            await fetch(`${SERVER_URL}/api/contractors/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
             load();
-        };
-
-        async function del(id) {
-            if(confirm("Remove this contractor?")) {
-                // Updated fetch to use SERVER_URL
-                await fetch(`${SERVER_URL}/api/contractors/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                load();
-            }
         }
-        window.onload = load;
-    </script>
+    }
+
+    // --- 2. WORKSPACE & LEDGER ---
+    function showMainView() {
+        document.getElementById('main-view').classList.remove('hidden');
+        document.getElementById('workspace-view').classList.add('hidden');
+        document.getElementById('invoice-view').classList.add('hidden');
+    }
+
+    async function openWorkspace(sc) {
+        activeSC = sc;
+        document.getElementById('main-view').classList.add('hidden');
+        document.getElementById('workspace-view').classList.remove('hidden');
+        document.getElementById('ws-name').innerText = sc.name;
+
+        document.getElementById('l-allot').innerText = (sc.allottedTotal || 0).toLocaleString();
+
+        const res = await fetch(`${SERVER_URL}/api/sc-bills/${sc._id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const bills = await res.json();
+        
+        let totalBilled = 0;
+        document.getElementById('bill-history-table').innerHTML = bills.map(b => {
+            totalBilled += b.grossAmount;
+            return `<tr>
+                        <td>${new Date(b.dateGenerated).toLocaleDateString()}</td>
+                        <td class="fw-bold">${b.billNo}</td>
+                        <td>${b.projectName}</td>
+                        <td class="text-primary fw-bold">₹${b.grossAmount.toLocaleString()}</td>
+                        <td class="text-danger fw-bold">₹${b.totalDeductions.toLocaleString()}</td>
+                        <td class="text-success fw-bold">₹${b.netAmount.toLocaleString()}</td>
+                    </tr>`;
+        }).join('');
+
+        if(bills.length === 0) document.getElementById('bill-history-table').innerHTML = '<tr><td colspan="6" class="text-muted">No bills generated yet.</td></tr>';
+
+        document.getElementById('l-billed').innerText = totalBilled.toLocaleString();
+        document.getElementById('l-pending').innerText = ((sc.allottedTotal || 0) - totalBilled).toLocaleString();
+    }
+
+    async function updateAllotment() {
+        const amt = prompt("Enter new Total Allotted Amount (₹):", activeSC.allottedTotal || 0);
+        if(amt && !isNaN(amt)) {
+            await fetch(`${SERVER_URL}/api/contractors/${activeSC._id}/ledger`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ allottedTotal: Number(amt), allottedDeductions: 0, allottedNet: 0 })
+            });
+            alert("Ledger updated. Re-open workspace to refresh.");
+            showMainView();
+        }
+    }
+
+    // --- 3. INVOICE GENERATOR ---
+    const earnRows = ['Work done', 'Add escalation (if any as per WO)', 'Value of sub contractor work', 'Mobilization advance', 'Material/work advance/ own material'];
+    const dedRows = ['Recoveries of HSD of supply', 'Recovery of witheld (Royalty)', 'Amount hold against sub-standard work', 'Other deduction', 'Recovery of Retention 5%', 'Tax Deduction at source 2%'];
+
+    function showInvoiceForm() {
+        document.getElementById('workspace-view').classList.add('hidden');
+        document.getElementById('invoice-view').classList.remove('hidden');
+        
+        // Auto-fill SC Details
+        document.getElementById('inv-sc-name').innerText = activeSC.name;
+        document.getElementById('inv-sc-add').innerText = activeSC.address || '';
+        document.getElementById('inv-sc-pan').innerText = activeSC.pan || '';
+        document.getElementById('inv-sc-gst').innerText = activeSC.gstin || '';
+
+        // Build Grids dynamically
+        buildGrid('earn-body', earnRows, 'e', 1);
+        buildGrid('ded-body', dedRows, 'd', 1);
+        calcTotals(); // Reset totals
+    }
+
+    function closeInvoice() {
+        document.getElementById('invoice-view').classList.add('hidden');
+        document.getElementById('workspace-view').classList.remove('hidden');
+    }
+
+    function buildGrid(tbodyId, rows, prefix, startIndex) {
+        let html = '';
+        rows.forEach((desc, i) => {
+            html += `<tr>
+                <td class="text-center">${startIndex++}</td>
+                <td>${desc}</td>
+                <td><input type="text" class="inv-input"></td>
+                <td><input type="number" class="inv-input inv-num calc-amt" id="${prefix}p-${i}" oninput="calcTotals()"></td>
+                <td><input type="number" class="inv-input inv-num calc-amt" id="${prefix}t-${i}" oninput="calcTotals()"></td>
+                <td><input type="number" class="inv-input inv-num fw-bold" id="${prefix}u-${i}" readonly></td>
+            </tr>`;
+        });
+        document.getElementById(tbodyId).innerHTML = html;
+    }
+
+    function calcTotals() {
+        // Earnings
+        let earnPrev = 0, earnThis = 0;
+        earnRows.forEach((_, i) => {
+            let p = Number(document.getElementById(`ep-${i}`).value) || 0;
+            let t = Number(document.getElementById(`et-${i}`).value) || 0;
+            document.getElementById(`eu-${i}`).value = p + t;
+            earnPrev += p; earnThis += t;
+        });
+        document.getElementById('gt-prev').value = earnPrev;
+        document.getElementById('gt-this').value = earnThis;
+        document.getElementById('gt-upto').value = earnPrev + earnThis;
+
+        // Deductions
+        let dedPrev = 0, dedThis = 0;
+        dedRows.forEach((_, i) => {
+            let p = Number(document.getElementById(`dp-${i}`).value) || 0;
+            let t = Number(document.getElementById(`dt-${i}`).value) || 0;
+            document.getElementById(`du-${i}`).value = p + t;
+            dedPrev += p; dedThis += t;
+        });
+        document.getElementById('td-prev').value = dedPrev;
+        document.getElementById('td-this').value = dedThis;
+        document.getElementById('td-upto').value = dedPrev + dedThis;
+
+        // Net Calculations
+        let rap = Number(document.getElementById('ra-prev').value) || 0;
+        let rat = Number(document.getElementById('ra-this').value) || 0;
+        document.getElementById('ra-upto').value = rap + rat;
+
+        let netPrev = earnPrev - dedPrev + rap;
+        let netThis = earnThis - dedThis + rat;
+        
+        document.getElementById('net-prev').value = netPrev;
+        document.getElementById('net-this').value = netThis;
+        document.getElementById('net-upto').value = netPrev + netThis;
+
+        // Translate to words
+        document.getElementById('amt-words').innerText = numberToWords(netThis) + " RUPEES ONLY";
+    }
+
+    async function saveAndPrintInvoice() {
+        const gross = Number(document.getElementById('gt-this').value) || 0;
+        const ded = Number(document.getElementById('td-this').value) || 0;
+        const net = Number(document.getElementById('net-this').value) || 0;
+        
+        if (net <= 0) {
+            if(!confirm("Net amount is zero or negative. Print anyway?")) return;
+        }
+
+        // Save bill to Ledger DB
+        await fetch(`${SERVER_URL}/api/sc-bills`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ 
+                contractorId: activeSC._id, 
+                projectName: document.getElementById('inv-proj').value || 'General',
+                billNo: "INV-" + Date.now().toString().slice(-6),
+                grossAmount: gross, totalDeductions: ded, netAmount: net
+            })
+        });
+
+        // Open print dialog
+        window.print();
+        
+        // Return to workspace and refresh ledger
+        closeInvoice();
+        openWorkspace(activeSC); 
+    }
+
+    // Standard Indian Number to Words Format
+    function numberToWords(num) {
+        if (num === 0 || num < 0) return "ZERO";
+        const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        if ((num = num.toString()).length > 9) return 'OVERFLOW';
+        let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n) return; let str = '';
+        str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+        str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+        str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+        str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
+        str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+        return str.trim();
+    }
+
+    window.onload = load;
+</script>
 </body>
 </html>
