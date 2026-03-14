@@ -17,7 +17,10 @@
         .inv-input { border: none; border-bottom: 1px dashed #ccc; width: 100%; background: transparent; outline: none; }
         .inv-num { text-align: right; width: 100px; }
         .calc-amt { background: #fdfdfd; }
-        .pdf-text-value { display: inline-block; padding: 2px 0; min-height: 20px; width: 100%; } /* Used when converting to PDF */
+        .pdf-text-value { display: inline-block; padding: 2px 0; min-height: 20px; width: 100%; }
+        
+        .wo-link { display: block; padding: 10px; background: #e9ecef; border-radius: 8px; margin-bottom: 10px; text-decoration: none; color: #333; font-weight: bold; border-left: 4px solid #0dcaf0; transition: 0.2s; }
+        .wo-link:hover { background: #dee2e6; transform: translateX(5px); }
     </style>
 </head>
 <body>
@@ -40,7 +43,7 @@
                             <input type="text" id="cAdd" class="form-control mb-2 bg-light" placeholder="Full Address" required>
                             <input type="text" id="cPan" class="form-control mb-2 bg-light" placeholder="PAN Number" required>
                             <input type="text" id="cGst" class="form-control mb-3 bg-light" placeholder="GSTIN Number" required>
-                            <label class="small fw-bold text-muted">Upload Work Order (PDF/Image)</label>
+                            <label class="small fw-bold text-muted">Upload Initial Work Order</label>
                             <input type="file" id="cFile" class="form-control mb-3 bg-light" accept=".pdf,image/*">
                             <button class="btn btn-secondary w-100 fw-bold shadow-sm" id="saveBtn">Add Contractor</button>
                         </form>
@@ -62,8 +65,8 @@
         </div>
 
         <div class="row g-4 no-print">
-            <div class="col-md-12">
-                <div class="card border-0 shadow-sm border-top border-primary border-4 p-4">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm border-top border-primary border-4 p-4 h-100">
                     <h5 class="fw-bold border-bottom pb-2">Financial Ledger</h5>
                     
                     <div class="row text-center mb-4">
@@ -93,9 +96,26 @@
                         <button class="btn btn-success fw-bold shadow-sm" onclick="showInvoiceForm()">➕ Create New Tax Invoice</button>
                     </div>
                     <table class="table table-striped table-bordered table-sm text-center align-middle">
-                        <thead class="table-dark"><tr><th>Date</th><th>Bill No. (Click for PDF)</th><th>Project</th><th>Gross Bill</th><th>Deductions</th><th class="text-success">Net Paid</th></tr></thead>
+                        <thead class="table-dark"><tr><th>Date</th><th>Bill No.</th><th>Project</th><th>Gross Bill</th><th>Deductions</th><th class="text-success">Net Paid</th></tr></thead>
                         <tbody id="bill-history-table"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm border-top border-info border-4 p-4 h-100">
+                    <h5 class="fw-bold border-bottom pb-2">Document Hub</h5>
+                    <p class="small text-muted mb-3">View and manage Work Orders & Amendments</p>
+                    
+                    <div id="wo-list" class="mb-4" style="max-height: 250px; overflow-y: auto;">
+                        </div>
+
+                    <form id="add-wo-form" class="mt-auto p-3 bg-light rounded border">
+                        <h6 class="fw-bold mb-2">Upload New Document</h6>
+                        <input type="text" id="newWoTitle" class="form-control form-control-sm mb-2" placeholder="Doc Title (e.g. Amendment 1)" required>
+                        <input type="file" id="newWoFile" class="form-control form-control-sm mb-3" accept=".pdf,image/*" required>
+                        <button type="submit" id="addWoBtn" class="btn btn-sm btn-info w-100 fw-bold text-dark">📤 Upload to Hub</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -108,7 +128,6 @@
         </div>
 
         <div class="invoice-box shadow-sm mb-5" id="printable-invoice">
-            
             <div class="text-center mb-3">
                 <h3 class="fw-bold mb-1">MS GREEN CHANNEL POWER PRIVATE LIMITED</h3>
                 <p class="mb-0 fw-bold">THATHRI CHINAR MOHALLA THATHRI, DISTRICT DODA (JAMMU & KASHMIR), 182203</p>
@@ -149,15 +168,12 @@
                 Contractors bill detail From: <input type="date" class="inv-input" style="width:130px;"> To: <input type="date" class="inv-input" style="width:130px;">
             </div>
 
-            <div class="text-center fw-bold border border-dark border-bottom-0 py-1 text-uppercase bg-light">
-                Earnings / Gross Bill
-            </div>
+            <div class="text-center fw-bold border border-dark border-bottom-0 py-1 text-uppercase bg-light">Earnings / Gross Bill</div>
             <table class="inv-table mb-0 border-top-0">
                 <thead class="text-center small">
                     <tr><th width="5%">S.No</th><th width="35%">Description</th><th width="15%">Reference</th><th>Upto Prev Bill (₹)</th><th>For This Bill (₹)</th><th>Upto This Bill (₹)</th></tr>
                 </thead>
-                <tbody id="earn-body">
-                    </tbody>
+                <tbody id="earn-body"></tbody>
                 <tfoot class="fw-bold">
                     <tr><td colspan="3" class="text-end">GROSS TOTAL VALUE (Including GST)</td>
                     <td><input type="number" class="inv-input inv-num" id="gt-prev" readonly></td>
@@ -166,15 +182,12 @@
                 </tfoot>
             </table>
 
-            <div class="text-center fw-bold border border-dark border-bottom-0 border-top-0 py-1 mt-3 text-uppercase bg-light">
-                Deduction & Recoveries
-            </div>
+            <div class="text-center fw-bold border border-dark border-bottom-0 border-top-0 py-1 mt-3 text-uppercase bg-light">Deduction & Recoveries</div>
             <table class="inv-table border-top-0">
                 <thead class="text-center small d-none">
                     <tr><th width="5%">S.No</th><th width="35%">Description</th><th width="15%">Reference</th><th>Upto Prev Bill (₹)</th><th>For This Bill (₹)</th><th>Upto This Bill (₹)</th></tr>
                 </thead>
-                <tbody id="ded-body">
-                    </tbody>
+                <tbody id="ded-body"></tbody>
                 <tfoot class="fw-bold">
                     <tr><td colspan="3" class="text-end">TOTAL DEDUCTION</td>
                     <td><input type="number" class="inv-input inv-num" id="td-prev" readonly></td>
@@ -214,7 +227,7 @@
 
     let activeSC = null;
 
-    // --- 1. CONTRACTOR CRUD ---
+    // --- 1. CRUD & LOAD MAIN LIST ---
     async function load() {
         const res = await fetch(`${SERVER_URL}/api/contractors`, { headers: { 'Authorization': `Bearer ${token}` } });
         const list = await res.json();
@@ -227,14 +240,13 @@
             div.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h5 class="mb-0 fw-bold text-primary">${c.name}</h5>
-                    <button class="btn btn-sm btn-dark fw-bold px-3 shadow-sm" onclick='openWorkspace(${JSON.stringify(c).replace(/'/g, "&apos;")})'>💼 Ledger & Bills</button>
+                    <div>
+                        <button class="btn btn-sm btn-dark fw-bold px-3 shadow-sm" onclick='openWorkspace(${JSON.stringify(c).replace(/'/g, "&apos;")})'>💼 Open Workspace</button>
+                        <button class="btn btn-sm btn-outline-danger ms-2 fw-bold" onclick="del('${c._id}')">🗑️ Delete</button>
+                    </div>
                 </div>
-                <div class="small text-dark fw-bold mb-2">
+                <div class="small text-dark fw-bold">
                     📍 ${c.address || 'N/A'} &nbsp;|&nbsp; PAN: ${c.pan || 'N/A'} &nbsp;|&nbsp; GSTIN: ${c.gstin || 'N/A'}
-                </div>
-                <div>
-                    ${c.workOrderUrl ? `<a href="${SERVER_URL}${c.workOrderUrl}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">📄 View WO</a>` : '<span class="text-muted small border px-2 py-1 rounded">No WO File</span>'}
-                    <button class="btn btn-sm btn-outline-danger ms-2 fw-bold" onclick="del('${c._id}')">🗑️ Delete</button>
                 </div>`;
             container.appendChild(div);
         });
@@ -271,7 +283,7 @@
         }
     }
 
-    // --- 2. WORKSPACE & LEDGER ---
+    // --- 2. WORKSPACE & WORK ORDERS ---
     function showMainView() {
         document.getElementById('main-view').classList.remove('hidden');
         document.getElementById('workspace-view').classList.add('hidden');
@@ -284,16 +296,22 @@
         document.getElementById('workspace-view').classList.remove('hidden');
         document.getElementById('ws-name').innerText = sc.name;
 
+        // Ledger Basics
         document.getElementById('l-allot').innerText = (sc.allottedTotal || 0).toLocaleString();
 
+        // 1. Populate Work Orders Hub
+        const woContainer = document.getElementById('wo-list');
+        woContainer.innerHTML = sc.workOrders && sc.workOrders.length > 0 
+            ? sc.workOrders.map(wo => `<a href="${SERVER_URL}${wo.url}" target="_blank" class="wo-link">📄 ${wo.title} <small class="text-muted d-block fw-normal mt-1">Uploaded: ${new Date(wo.dateAdded).toLocaleDateString()}</small></a>`).join('')
+            : '<p class="text-muted small">No documents uploaded.</p>';
+
+        // 2. Fetch and Populate Bills
         const res = await fetch(`${SERVER_URL}/api/sc-bills/${sc._id}`, { headers: { 'Authorization': `Bearer ${token}` } });
         const bills = await res.json();
         
         let totalBilled = 0;
         document.getElementById('bill-history-table').innerHTML = bills.map(b => {
             totalBilled += b.grossAmount;
-            
-            // HYPERLINK THE PDF IF IT EXISTS
             const billLink = b.pdfUrl 
                 ? `<a href="${SERVER_URL}${b.pdfUrl}" target="_blank" class="text-primary text-decoration-none fw-bold" title="View PDF">📄 ${b.billNo}</a>` 
                 : `<span class="fw-bold">${b.billNo}</span>`;
@@ -315,25 +333,43 @@
     }
 
     async function updateAllotment() {
-        // ADDITION LOGIC: Ask for the amount to ADD to the current total
         const amt = prompt("Enter additional amount to ADD to the existing allotment (₹):");
-        
         if(amt && !isNaN(amt)) {
-            const currentTotal = activeSC.allottedTotal || 0;
-            const newTotal = currentTotal + Number(amt);
-
+            const newTotal = (activeSC.allottedTotal || 0) + Number(amt);
             await fetch(`${SERVER_URL}/api/contractors/${activeSC._id}/ledger`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ allottedTotal: newTotal, allottedDeductions: 0, allottedNet: 0 })
             });
-            
-            // Update the UI immediately without full reload
             activeSC.allottedTotal = newTotal;
             openWorkspace(activeSC); 
         }
     }
 
-    // --- 3. INVOICE GENERATOR & PDF ENGINE ---
+    document.getElementById('add-wo-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('addWoBtn');
+        btn.disabled = true; btn.innerText = "Uploading...";
+
+        const file = document.getElementById('newWoFile').files[0];
+        const fd = new FormData(); fd.append('workOrder', file);
+        const upRes = await fetch(`${SERVER_URL}/api/upload-work-order`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+        const fileUrl = (await upRes.json()).url;
+
+        await fetch(`${SERVER_URL}/api/contractors/${activeSC._id}/workorders`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ title: document.getElementById('newWoTitle').value, url: fileUrl })
+        });
+
+        document.getElementById('newWoTitle').value = ''; document.getElementById('newWoFile').value = '';
+        btn.disabled = false; btn.innerText = "📤 Upload to Hub";
+        
+        // Fetch updated SC data from server to refresh workspace
+        const res = await fetch(`${SERVER_URL}/api/contractors`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const list = await res.json();
+        openWorkspace(list.find(c => c._id === activeSC._id));
+    };
+
+    // --- 3. INVOICE GENERATOR ---
     const earnRows = ['Work done', 'Add escalation (if any as per WO)', 'Value of sub contractor work', 'Mobilization advance', 'Material/work advance/ own material'];
     const dedRows = ['Recoveries of HSD of supply', 'Recovery of witheld (Royalty)', 'Amount hold against sub-standard work', 'Other deduction', 'Recovery of Retention 5%', 'Tax Deduction at source 2%'];
 
@@ -408,7 +444,6 @@
         document.getElementById('amt-words').innerText = numberToWords(netThis) + " RUPEES ONLY";
     }
 
-    // PDF HELPER FUNCTIONS
     function transformInputsToText() {
         document.querySelectorAll('.inv-input').forEach(input => {
             const span = document.createElement('span');
@@ -429,68 +464,49 @@
         const ded = Number(document.getElementById('td-this').value) || 0;
         const net = Number(document.getElementById('net-this').value) || 0;
         
-        if (net <= 0) {
-            if(!confirm("Net amount is zero or negative. Proceed anyway?")) return;
-        }
+        if (net <= 0) { if(!confirm("Net amount is zero or negative. Proceed anyway?")) return; }
 
         const btn = document.getElementById('saveBillBtn');
-        btn.disabled = true;
-        btn.innerText = "Generating PDF...";
+        btn.disabled = true; btn.innerText = "Generating PDF...";
 
-        // 1. Swap input boxes for plain text so the PDF looks clean
         transformInputsToText();
-
-        // 2. Create the PDF file in the background
         const element = document.getElementById('printable-invoice');
-        const opt = {
-            margin:       0.5,
-            filename:     'Invoice.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
+        const opt = { margin: 0.5, filename: 'Invoice.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
 
         try {
             const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-            revertTextToInputs(); // Bring inputs back
+            revertTextToInputs(); 
             btn.innerText = "Uploading to Cloud...";
 
-            // 3. Upload PDF to server
             const fd = new FormData();
             fd.append('file', pdfBlob, `INV-${Date.now()}.pdf`);
-            const upRes = await fetch(`${SERVER_URL}/api/upload-file`, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd
-            });
-            const uploadData = await upRes.json();
-            const pdfUrl = uploadData.url;
+            const upRes = await fetch(`${SERVER_URL}/api/upload-file`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+            const pdfUrl = (await upRes.json()).url;
 
             btn.innerText = "Saving Ledger...";
 
-            // 4. Save Database Record with PDF URL
             await fetch(`${SERVER_URL}/api/sc-bills`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ 
-                    contractorId: activeSC._id, 
-                    projectName: document.getElementById('inv-proj').value || 'General',
-                    billNo: "INV-" + Date.now().toString().slice(-6),
-                    grossAmount: gross, totalDeductions: ded, netAmount: net,
-                    pdfUrl: pdfUrl // Save the link!
+                    contractorId: activeSC._id, projectName: document.getElementById('inv-proj').value || 'General',
+                    billNo: "INV-" + Date.now().toString().slice(-6), grossAmount: gross, totalDeductions: ded, netAmount: net,
+                    pdfUrl: pdfUrl
                 })
             });
 
-            alert("Invoice generated and saved to ledger securely!");
+            alert("Invoice generated and saved to ledger!");
+            window.print();
             closeInvoice();
-            openWorkspace(activeSC); 
+            
+            // Refresh workspace
+            const res = await fetch(`${SERVER_URL}/api/contractors`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const list = await res.json();
+            openWorkspace(list.find(c => c._id === activeSC._id)); 
 
         } catch (error) {
-            console.error(error);
-            alert("Error generating PDF. Please check connection.");
-            revertTextToInputs();
+            alert("Error generating PDF."); revertTextToInputs();
         }
-
-        btn.disabled = false;
-        btn.innerText = "💾 Save to Ledger & Generate PDF";
+        btn.disabled = false; btn.innerText = "💾 Save to Ledger & Generate PDF";
     }
 
     function numberToWords(num) {
