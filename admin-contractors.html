@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Sub-Contractors | MS Green Channel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { background: #f4f7f6; }
         .hidden { display: none !important; }
@@ -16,14 +17,7 @@
         .inv-input { border: none; border-bottom: 1px dashed #ccc; width: 100%; background: transparent; outline: none; }
         .inv-num { text-align: right; width: 100px; }
         .calc-amt { background: #fdfdfd; }
-        
-        @media print {
-            body { background: white; margin: 0; padding: 0; }
-            .no-print { display: none !important; }
-            .invoice-box { border: none; padding: 0; margin-top: 0; }
-            .inv-input { border-bottom: none; }
-            @page { margin: 0.5cm; }
-        }
+        .pdf-text-value { display: inline-block; padding: 2px 0; min-height: 20px; width: 100%; } /* Used when converting to PDF */
     </style>
 </head>
 <body>
@@ -77,7 +71,7 @@
                             <div class="p-3 bg-light rounded border border-dark">
                                 <h6 class="text-muted text-uppercase small fw-bold">Allotted Amount</h6>
                                 <h4 class="text-dark fw-bold mb-2">₹<span id="l-allot">0</span></h4>
-                                <button class="btn btn-sm btn-dark" onclick="updateAllotment()">Edit Allotment</button>
+                                <button class="btn btn-sm btn-dark" onclick="updateAllotment()">➕ Add Allotment</button>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -99,7 +93,7 @@
                         <button class="btn btn-success fw-bold shadow-sm" onclick="showInvoiceForm()">➕ Create New Tax Invoice</button>
                     </div>
                     <table class="table table-striped table-bordered table-sm text-center align-middle">
-                        <thead class="table-dark"><tr><th>Date</th><th>Bill No</th><th>Project</th><th>Gross Bill</th><th>Deductions</th><th class="text-success">Net Paid</th></tr></thead>
+                        <thead class="table-dark"><tr><th>Date</th><th>Bill No. (Click for PDF)</th><th>Project</th><th>Gross Bill</th><th>Deductions</th><th class="text-success">Net Paid</th></tr></thead>
                         <tbody id="bill-history-table"></tbody>
                     </table>
                 </div>
@@ -110,7 +104,7 @@
     <div class="container hidden" id="invoice-view">
         <div class="mb-3 text-end no-print">
             <button class="btn btn-secondary me-2 fw-bold" onclick="closeInvoice()">Cancel</button>
-            <button class="btn btn-primary fw-bold shadow-sm" onclick="saveAndPrintInvoice()">💾 Save to Ledger & Print PDF</button>
+            <button class="btn btn-primary fw-bold shadow-sm" id="saveBillBtn" onclick="saveAndPrintInvoice()">💾 Save to Ledger & Generate PDF</button>
         </div>
 
         <div class="invoice-box shadow-sm mb-5" id="printable-invoice">
@@ -136,7 +130,7 @@
                 <tbody>
                     <tr><td class="text-center">1.1</td><td>Work order No. & Date</td><td><input type="text" class="inv-input"></td><td><input type="date" class="inv-input"></td></tr>
                     <tr><td class="text-center">1.2</td><td>Work order Amendment No. & Date</td><td><input type="text" class="inv-input"></td><td><input type="date" class="inv-input"></td></tr>
-                    <tr><td class="text-center">1.3</td><td>Work order Amount (Orignal & Amended)</td><td><input type="text" class="inv-input"></td><td></td></tr>
+                    <tr><td class="text-center">1.3</td><td>Work order Amount (Original & Amended)</td><td><input type="text" class="inv-input"></td><td></td></tr>
                     <tr><td class="text-center">1.4</td><td>Work order Approval status (HO/CO/site)</td><td><input type="text" class="inv-input"></td><td></td></tr>
                     <tr><td class="text-center">1.5</td><td>SC work period From and To</td><td><input type="text" class="inv-input" placeholder="From Date - To Date"></td><td></td></tr>
                 </tbody>
@@ -298,9 +292,15 @@
         let totalBilled = 0;
         document.getElementById('bill-history-table').innerHTML = bills.map(b => {
             totalBilled += b.grossAmount;
+            
+            // HYPERLINK THE PDF IF IT EXISTS
+            const billLink = b.pdfUrl 
+                ? `<a href="${SERVER_URL}${b.pdfUrl}" target="_blank" class="text-primary text-decoration-none fw-bold" title="View PDF">📄 ${b.billNo}</a>` 
+                : `<span class="fw-bold">${b.billNo}</span>`;
+
             return `<tr>
                         <td>${new Date(b.dateGenerated).toLocaleDateString()}</td>
-                        <td class="fw-bold">${b.billNo}</td>
+                        <td>${billLink}</td>
                         <td>${b.projectName}</td>
                         <td class="text-primary fw-bold">₹${b.grossAmount.toLocaleString()}</td>
                         <td class="text-danger fw-bold">₹${b.totalDeductions.toLocaleString()}</td>
@@ -308,25 +308,32 @@
                     </tr>`;
         }).join('');
 
-        if(bills.length === 0) document.getElementById('bill-history-table').innerHTML = '<tr><td colspan="6" class="text-muted">No bills generated yet.</td></tr>';
+        if(bills.length === 0) document.getElementById('bill-history-table').innerHTML = '<tr><td colspan="6" class="text-muted py-3">No bills generated yet.</td></tr>';
 
         document.getElementById('l-billed').innerText = totalBilled.toLocaleString();
         document.getElementById('l-pending').innerText = ((sc.allottedTotal || 0) - totalBilled).toLocaleString();
     }
 
     async function updateAllotment() {
-        const amt = prompt("Enter new Total Allotted Amount (₹):", activeSC.allottedTotal || 0);
+        // ADDITION LOGIC: Ask for the amount to ADD to the current total
+        const amt = prompt("Enter additional amount to ADD to the existing allotment (₹):");
+        
         if(amt && !isNaN(amt)) {
+            const currentTotal = activeSC.allottedTotal || 0;
+            const newTotal = currentTotal + Number(amt);
+
             await fetch(`${SERVER_URL}/api/contractors/${activeSC._id}/ledger`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ allottedTotal: Number(amt), allottedDeductions: 0, allottedNet: 0 })
+                body: JSON.stringify({ allottedTotal: newTotal, allottedDeductions: 0, allottedNet: 0 })
             });
-            alert("Ledger updated. Re-open workspace to refresh.");
-            showMainView();
+            
+            // Update the UI immediately without full reload
+            activeSC.allottedTotal = newTotal;
+            openWorkspace(activeSC); 
         }
     }
 
-    // --- 3. INVOICE GENERATOR ---
+    // --- 3. INVOICE GENERATOR & PDF ENGINE ---
     const earnRows = ['Work done', 'Add escalation (if any as per WO)', 'Value of sub contractor work', 'Mobilization advance', 'Material/work advance/ own material'];
     const dedRows = ['Recoveries of HSD of supply', 'Recovery of witheld (Royalty)', 'Amount hold against sub-standard work', 'Other deduction', 'Recovery of Retention 5%', 'Tax Deduction at source 2%'];
 
@@ -334,16 +341,14 @@
         document.getElementById('workspace-view').classList.add('hidden');
         document.getElementById('invoice-view').classList.remove('hidden');
         
-        // Auto-fill SC Details
         document.getElementById('inv-sc-name').innerText = activeSC.name;
         document.getElementById('inv-sc-add').innerText = activeSC.address || '';
         document.getElementById('inv-sc-pan').innerText = activeSC.pan || '';
         document.getElementById('inv-sc-gst').innerText = activeSC.gstin || '';
 
-        // Build Grids dynamically
         buildGrid('earn-body', earnRows, 'e', 1);
         buildGrid('ded-body', dedRows, 'd', 1);
-        calcTotals(); // Reset totals
+        calcTotals(); 
     }
 
     function closeInvoice() {
@@ -367,7 +372,6 @@
     }
 
     function calcTotals() {
-        // Earnings
         let earnPrev = 0, earnThis = 0;
         earnRows.forEach((_, i) => {
             let p = Number(document.getElementById(`ep-${i}`).value) || 0;
@@ -379,7 +383,6 @@
         document.getElementById('gt-this').value = earnThis;
         document.getElementById('gt-upto').value = earnPrev + earnThis;
 
-        // Deductions
         let dedPrev = 0, dedThis = 0;
         dedRows.forEach((_, i) => {
             let p = Number(document.getElementById(`dp-${i}`).value) || 0;
@@ -391,7 +394,6 @@
         document.getElementById('td-this').value = dedThis;
         document.getElementById('td-upto').value = dedPrev + dedThis;
 
-        // Net Calculations
         let rap = Number(document.getElementById('ra-prev').value) || 0;
         let rat = Number(document.getElementById('ra-this').value) || 0;
         document.getElementById('ra-upto').value = rap + rat;
@@ -403,8 +405,23 @@
         document.getElementById('net-this').value = netThis;
         document.getElementById('net-upto').value = netPrev + netThis;
 
-        // Translate to words
         document.getElementById('amt-words').innerText = numberToWords(netThis) + " RUPEES ONLY";
+    }
+
+    // PDF HELPER FUNCTIONS
+    function transformInputsToText() {
+        document.querySelectorAll('.inv-input').forEach(input => {
+            const span = document.createElement('span');
+            span.className = 'pdf-text-value';
+            span.innerText = input.value || ' ';
+            input.style.display = 'none';
+            input.parentNode.insertBefore(span, input);
+        });
+    }
+
+    function revertTextToInputs() {
+        document.querySelectorAll('.pdf-text-value').forEach(span => span.remove());
+        document.querySelectorAll('.inv-input').forEach(input => input.style.display = '');
     }
 
     async function saveAndPrintInvoice() {
@@ -413,30 +430,69 @@
         const net = Number(document.getElementById('net-this').value) || 0;
         
         if (net <= 0) {
-            if(!confirm("Net amount is zero or negative. Print anyway?")) return;
+            if(!confirm("Net amount is zero or negative. Proceed anyway?")) return;
         }
 
-        // Save bill to Ledger DB
-        await fetch(`${SERVER_URL}/api/sc-bills`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ 
-                contractorId: activeSC._id, 
-                projectName: document.getElementById('inv-proj').value || 'General',
-                billNo: "INV-" + Date.now().toString().slice(-6),
-                grossAmount: gross, totalDeductions: ded, netAmount: net
-            })
-        });
+        const btn = document.getElementById('saveBillBtn');
+        btn.disabled = true;
+        btn.innerText = "Generating PDF...";
 
-        // Open print dialog
-        window.print();
-        
-        // Return to workspace and refresh ledger
-        closeInvoice();
-        openWorkspace(activeSC); 
+        // 1. Swap input boxes for plain text so the PDF looks clean
+        transformInputsToText();
+
+        // 2. Create the PDF file in the background
+        const element = document.getElementById('printable-invoice');
+        const opt = {
+            margin:       0.5,
+            filename:     'Invoice.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        try {
+            const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+            revertTextToInputs(); // Bring inputs back
+            btn.innerText = "Uploading to Cloud...";
+
+            // 3. Upload PDF to server
+            const fd = new FormData();
+            fd.append('file', pdfBlob, `INV-${Date.now()}.pdf`);
+            const upRes = await fetch(`${SERVER_URL}/api/upload-file`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd
+            });
+            const uploadData = await upRes.json();
+            const pdfUrl = uploadData.url;
+
+            btn.innerText = "Saving Ledger...";
+
+            // 4. Save Database Record with PDF URL
+            await fetch(`${SERVER_URL}/api/sc-bills`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    contractorId: activeSC._id, 
+                    projectName: document.getElementById('inv-proj').value || 'General',
+                    billNo: "INV-" + Date.now().toString().slice(-6),
+                    grossAmount: gross, totalDeductions: ded, netAmount: net,
+                    pdfUrl: pdfUrl // Save the link!
+                })
+            });
+
+            alert("Invoice generated and saved to ledger securely!");
+            closeInvoice();
+            openWorkspace(activeSC); 
+
+        } catch (error) {
+            console.error(error);
+            alert("Error generating PDF. Please check connection.");
+            revertTextToInputs();
+        }
+
+        btn.disabled = false;
+        btn.innerText = "💾 Save to Ledger & Generate PDF";
     }
 
-    // Standard Indian Number to Words Format
     function numberToWords(num) {
         if (num === 0 || num < 0) return "ZERO";
         const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
